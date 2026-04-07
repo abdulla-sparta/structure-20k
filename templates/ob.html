@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StructureEngine — OB Experiment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+<style>
+:root{
+  --bg:#f0f2f5;--surface:#fff;--border:#e2e6ea;--text:#1a1d23;--muted:#6b7280;
+  --blue:#0f6fff;--green:#16a34a;--red:#dc2626;--amber:#d97706;--purple:#7c3aed;
+  --surface2:#f8f9fb;--teal:#0891b2;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh;display:flex;flex-direction:column}
+
+/* NAV */
+.nav{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:14px;flex-shrink:0;position:sticky;top:0;z-index:100}
+.nav-logo{font-weight:600;font-size:14px;letter-spacing:.5px}
+.badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px}
+.badge-paper{background:#fef3c7;color:#92400e}
+.badge-ob{background:#f0f9ff;color:var(--teal);border:1px solid #bae6fd}
+.nav-sep{width:1px;height:20px;background:var(--border)}
+.nav-tab{padding:6px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:500;font-size:13px;text-decoration:none}
+.nav-tab:hover{background:var(--bg);color:var(--text)}
+.nav-tab.active{background:#f0f9ff;color:var(--teal);font-weight:600}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#e2e6ea;transition:background .3s}
+.conn-dot.live{background:var(--green);box-shadow:0 0 6px rgba(22,163,74,.5)}
+.conn-dot.dead{background:var(--red)}
+.conn-label{font-size:11px;color:var(--muted);font-weight:500}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.engine-status{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:12px}
+.eng-dot{width:8px;height:8px;border-radius:50%;background:#e2e6ea}
+.eng-dot.on{background:var(--green);box-shadow:0 0 5px rgba(22,163,74,.5);animation:pulse 2s infinite}
+.eng-dot.warn{background:var(--amber)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn{padding:8px 16px;border-radius:8px;border:none;font-weight:600;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;display:flex;align-items:center;gap:6px}
+.btn-start{background:var(--teal);color:#fff}
+.btn-start:hover{background:#0e7490}
+.btn-start.running{background:var(--muted)}
+.btn-stop{background:#fee2e2;color:var(--red);border:1px solid #fca5a5}
+.btn-stop:hover{background:#fecaca}
+.info-chip{font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:4px 10px;border-radius:6px}
+
+/* PORTFOLIO SUMMARY */
+.port-bar{display:grid;grid-template-columns:repeat(6,1fr);background:var(--surface);border-bottom:1px solid var(--border)}
+.port-cell{padding:10px 16px;border-right:1px solid var(--border);text-align:center}
+.port-cell:last-child{border-right:none}
+.port-label{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px}
+.port-val{font-size:15px;font-weight:700;font-family:'DM Mono',monospace}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+
+/* MAIN GRID */
+.main{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px;flex:1}
+
+/* SYMBOL CARD */
+.card{background:var(--surface);border-radius:12px;border:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column}
+.card.in-pos-profit{border-left:3px solid var(--green)}
+.card.in-pos-loss{border-left:3px solid var(--red)}
+.card.pending{border-left:3px solid var(--amber)}
+
+/* Card head */
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
+.sym-name{font-weight:700;font-size:16px}
+.bias-bull{font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;background:#dcfce7;color:#15803d}
+.bias-bear{font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;background:#fee2e2;color:#b91c1c}
+.bias-none{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:#f1f5f9;color:#94a3b8}
+.ltp-block{text-align:right}
+.ltp-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:700}
+.ltp-up{color:var(--green)}.ltp-down{color:var(--red)}.ltp-flat{color:var(--text)}
+.chg-pill{font-size:11px;font-weight:600;padding:2px 6px;border-radius:5px;font-family:'DM Mono',monospace}
+.chg-pos{background:#dcfce7;color:var(--green)}.chg-neg{background:#fee2e2;color:var(--red)}
+
+/* PnL row */
+.pnl-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--border)}
+.pnl-cell{padding:10px 14px;text-align:center;border-right:1px solid var(--border)}
+.pnl-cell:last-child{border-right:none}
+.pnl-label{font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.pnl-val{font-size:14px;font-weight:700;font-family:'DM Mono',monospace}
+
+/* Order book depth panel */
+.ob-panel{padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.ob-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.ob-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ob-side{background:var(--surface);border-radius:6px;padding:8px;border:1px solid var(--border)}
+.ob-side-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.ob-bid-title{color:var(--green)}.ob-ask-title{color:var(--red)}
+.ob-level{display:flex;justify-content:space-between;font-size:11px;font-family:'DM Mono',monospace;padding:2px 0;position:relative}
+.ob-level-bar{position:absolute;left:0;top:0;height:100%;border-radius:2px;opacity:.15;z-index:0}
+.ob-bid-bar{background:var(--green)}.ob-ask-bar{background:var(--red)}
+.ob-price{font-weight:600;z-index:1;position:relative}
+.ob-qty{color:var(--muted);z-index:1;position:relative}
+.ob-metrics{display:flex;gap:8px;margin-top:8px}
+.ob-metric{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;text-align:center}
+.ob-metric-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.ob-metric-val{font-size:13px;font-weight:700;font-family:'DM Mono',monospace;margin-top:2px}
+.imbal-bull{color:var(--green)}.imbal-bear{color:var(--red)}.imbal-neu{color:var(--muted)}
+
+/* Position box */
+.card-pos{padding:10px 14px;border-bottom:1px solid var(--border);min-height:52px;display:flex;align-items:center}
+.no-pos{color:var(--muted);font-size:11px;font-style:italic}
+.pos-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}
+.pos-item .pl{font-size:10px;color:var(--muted);font-weight:500;margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px}
+.pos-item .pv{font-size:12px;font-weight:600;font-family:'DM Mono',monospace}
+.side-buy{color:var(--blue)}.side-sell{color:var(--red)}
+.pending-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--amber);font-weight:600;animation:pulse 1.5s infinite}
+
+/* Activity log */
+.card-log{padding:10px 14px;flex:1;max-height:200px;overflow-y:auto}
+.log-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.log-entry{padding:5px 8px;border-radius:6px;margin-bottom:4px;font-size:11px;border-left:3px solid transparent}
+.log-entry.signal{background:#f0f9ff;border-color:var(--teal)}
+.log-entry.fill{background:#f0fdf4;border-color:var(--green)}
+.log-entry.miss{background:#fff7ed;border-color:var(--amber)}
+.log-entry.reject{background:#fff1f2;border-color:var(--red)}
+.log-entry.trade{background:#f5f0ff;border-color:var(--purple)}
+.log-time{color:var(--muted);font-family:'DM Mono',monospace;margin-right:6px}
+.log-side-buy{color:var(--blue);font-weight:700}
+.log-side-sell{color:var(--red);font-weight:700}
+
+/* Comparison panel */
+.compare-bar{background:var(--surface);border-top:1px solid var(--border);padding:12px 16px;flex-shrink:0}
+.compare-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.compare-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.compare-cell{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center}
+.compare-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+.compare-val{font-size:14px;font-weight:700;font-family:'DM Mono',monospace}
+.compare-sub{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1d23;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:999}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="nav-logo">STRUCTUREENGINE</span>
+  <span class="badge badge-paper">LIVE PAPER</span>
+  <span class="badge badge-ob">OB EXPERIMENT</span>
+  <div class="nav-sep"></div>
+  <a class="nav-tab" href="/">📈 Backtest</a>
+  <a class="nav-tab" href="/live">⏱ Live</a>
+  <a class="nav-tab" href="/heatmap">🔥 Heatmap</a>
+  <a class="nav-tab" href="/signals">📡 Signals</a>
+  <a class="nav-tab active" href="/ob">📖 OB</a>
+  <div class="nav-right">
+    <div class="conn-dot" id="connDot"></div>
+    <span class="conn-label" id="connLabel">Disconnected</span>
+  </div>
+</nav>
+
+<div class="toolbar">
+  <div class="engine-status">
+    <div class="eng-dot" id="mainEngDot"></div>
+    <span id="mainEngLabel" style="font-size:12px;color:var(--muted)">Main engine: checking…</span>
+  </div>
+  <div class="engine-status">
+    <div class="eng-dot" id="obEngDot"></div>
+    <span id="obEngLabel" style="font-size:12px;color:var(--muted)">OB engine: stopped</span>
+  </div>
+  <button class="btn btn-start" id="btnStart" onclick="startOB()">▶ Start OB Engine</button>
+  <button class="btn btn-stop" id="btnStop" onclick="stopOB()" style="display:none">⏹ Stop OB Engine</button>
+  <div class="info-chip">TRENT + M&amp;M · ₹50k each · Limit orders at bid/ask</div>
+  <div class="info-chip" id="configChip">Config: loading…</div>
+</div>
+
+<div class="port-bar">
+  <div class="port-cell"><div class="port-label">OB Balance (Total)</div><div class="port-val neu" id="portBal">₹1,00,000</div></div>
+  <div class="port-cell"><div class="port-label">Realised PnL</div><div class="port-val neu" id="portReal">—</div></div>
+  <div class="port-cell"><div class="port-label">Unrealised</div><div class="port-val neu" id="portUnreal">—</div></div>
+  <div class="port-cell"><div class="port-label">Net PnL</div><div class="port-val neu" id="portNet">—</div></div>
+  <div class="port-cell"><div class="port-label">Signals Today</div><div class="port-val neu" id="portSig">0</div></div>
+  <div class="port-cell"><div class="port-label">Fills Today</div><div class="port-val neu" id="portFills">0</div></div>
+</div>
+
+<div class="main" id="mainGrid">
+  <!-- Cards inserted by JS -->
+</div>
+
+<div class="compare-bar">
+  <div class="compare-title">📊 OB vs Main Engine Comparison (Today)</div>
+  <div class="compare-grid">
+    <div class="compare-cell">
+      <div class="compare-label">OB Net PnL</div>
+      <div class="compare-val neu" id="cmpOBNet">—</div>
+      <div class="compare-sub">TRENT + M&M · OB entries</div>
+    </div>
+    <div class="compare-cell">
+      <div class="compare-label">Main Net PnL</div>
+      <div class="compare-val neu" id="cmpMainNet">—</div>
+      <div class="compare-sub">TRENT + M&M · market fill</div>
+    </div>
+    <div class="compare-cell">
+      <div class="compare-label">OB Signals Fired</div>
+      <div class="compare-val neu" id="cmpOBSig">0</div>
+      <div class="compare-sub">Rejected + Filled + Missed</div>
+    </div>
+    <div class="compare-cell">
+      <div class="compare-label">Fill Rate</div>
+      <div class="compare-val neu" id="cmpFillRate">—</div>
+      <div class="compare-sub">Fills ÷ Signals</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const socket = io();
+let obRunning = false;
+let symbolData = {};
+let activityLog = { TRENT: [], 'M&M': [] };
+let stats = { signals: 0, fills: 0 };
+
+// ── Socket events ─────────────────────────────────────────────────────────
+socket.on('connect', () => {
+  document.getElementById('connDot').className = 'conn-dot live';
+  document.getElementById('connLabel').textContent = 'Live';
+  checkMainEngine();
+});
+socket.on('disconnect', () => {
+  document.getElementById('connDot').className = 'conn-dot dead';
+  document.getElementById('connLabel').textContent = 'Disconnected';
+});
+
+socket.on('ob_live_update', data => {
+  if (!data) return;
+  obRunning = data.running;
+  updateEngineStatus(data.running);
+  if (data.instruments) {
+    data.instruments.forEach(inst => {
+      symbolData[inst.symbol] = inst;
+      updateCard(inst.symbol);
+    });
+    updatePortfolio(data);
+  }
+});
+
+socket.on('ob_signal', data => {
+  stats.signals++;
+  addLog(data.symbol, 'signal',
+    `📡 ${data.side} signal @ ₹${data.entry} | spread=${data.spread}% imbal=${data.imbalance} | pending fill…`);
+  updateStats();
+});
+
+socket.on('ob_fill', data => {
+  stats.fills++;
+  addLog(data.symbol, 'fill',
+    `✅ FILLED ${data.side} @ ₹${data.fill_price} | SL ₹${data.stop} | TGT ₹${data.target} | qty ${data.qty}`);
+  updateStats();
+  toast(`✅ ${data.symbol} ${data.side} filled @ ₹${data.fill_price}`);
+});
+
+socket.on('ob_miss', data => {
+  addLog(data.symbol, 'miss', `⏰ Limit order missed — ${data.reason}`);
+});
+
+socket.on('ob_signal_rejected', data => {
+  addLog(data.symbol, 'reject',
+    `🚫 Rejected — ${data.reason}`);
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+function init() {
+  // Create placeholder cards
+  ['TRENT', 'M&M'].forEach(sym => {
+    symbolData[sym] = null;
+    createCard(sym);
+  });
+
+  // Load config chip
+  fetch('/locked_config').then(r => r.json()).then(c => {
+    document.getElementById('configChip').textContent =
+      c && c.name ? `Config: ${c.name} · rr=${c.rr_target} · cd=${c.cooldown}` : 'No config locked';
+  }).catch(() => {});
+
+  // Load current OB status
+  fetch('/ob/status').then(r => r.json()).then(data => {
+    if (data.running) {
+      obRunning = true;
+      updateEngineStatus(true);
+      if (data.instruments) {
+        data.instruments.forEach(inst => {
+          symbolData[inst.symbol] = inst;
+          updateCard(inst.symbol);
+        });
+        updatePortfolio(data);
+      }
+    }
+  }).catch(() => {});
+}
+
+// ── Main engine check ─────────────────────────────────────────────────────
+function checkMainEngine() {
+  fetch('/live_status').then(r => r.json()).then(d => {
+    const running = d && d.instruments && d.instruments.length > 0;
+    const dot = document.getElementById('mainEngDot');
+    const lbl = document.getElementById('mainEngLabel');
+    if (running) {
+      dot.className = 'eng-dot on';
+      lbl.textContent = 'Main engine: running ✅';
+      lbl.style.color = 'var(--green)';
+
+      // Pull main engine PnL for TRENT + M&M comparison
+      const trent = d.instruments.find(i => i.symbol === 'TRENT');
+      const mnm   = d.instruments.find(i => i.symbol === 'M&M');
+      const mainNet = (trent?.realised_pnl || 0) + (mnm?.realised_pnl || 0) +
+                      (trent?.unrealised_pnl || 0) + (mnm?.unrealised_pnl || 0);
+      const el = document.getElementById('cmpMainNet');
+      el.textContent = fmtPnl(mainNet);
+      el.className = 'compare-val ' + cls(mainNet);
+    } else {
+      dot.className = 'eng-dot warn';
+      lbl.textContent = 'Main engine: not running ⚠️';
+      lbl.style.color = 'var(--amber)';
+    }
+  }).catch(() => {
+    document.getElementById('mainEngDot').className = 'eng-dot';
+    document.getElementById('mainEngLabel').textContent = 'Main engine: unknown';
+  });
+}
+setInterval(checkMainEngine, 15000);
+
+// ── Engine controls ───────────────────────────────────────────────────────
+function startOB() {
+  document.getElementById('btnStart').textContent = '⏳ Starting…';
+  document.getElementById('btnStart').disabled = true;
+  fetch('/ob/start', { method: 'POST' }).then(r => r.json()).then(d => {
+    if (d.status === 'ok' || d.status === 'already_running') {
+      obRunning = true;
+      updateEngineStatus(true);
+      toast('✅ OB engine started — watching TRENT + M&M');
+    } else {
+      toast('❌ ' + (d.message || 'Failed to start'));
+      document.getElementById('btnStart').textContent = '▶ Start OB Engine';
+      document.getElementById('btnStart').disabled = false;
+    }
+  }).catch(e => {
+    toast('❌ Error: ' + e.message);
+    document.getElementById('btnStart').textContent = '▶ Start OB Engine';
+    document.getElementById('btnStart').disabled = false;
+  });
+}
+
+function stopOB() {
+  fetch('/ob/stop', { method: 'POST' }).then(r => r.json()).then(d => {
+    obRunning = false;
+    updateEngineStatus(false);
+    toast('⏹ OB engine stopped');
+  });
+}
+
+function updateEngineStatus(running) {
+  const dot = document.getElementById('obEngDot');
+  const lbl = document.getElementById('obEngLabel');
+  const btnStart = document.getElementById('btnStart');
+  const btnStop  = document.getElementById('btnStop');
+  if (running) {
+    dot.className = 'eng-dot on';
+    lbl.textContent = 'OB engine: running ✅';
+    lbl.style.color = 'var(--green)';
+    btnStart.style.display = 'none';
+    btnStop.style.display  = 'inline-flex';
+  } else {
+    dot.className = 'eng-dot';
+    lbl.textContent = 'OB engine: stopped';
+    lbl.style.color = 'var(--muted)';
+    btnStart.style.display = 'inline-flex';
+    btnStart.textContent = '▶ Start OB Engine';
+    btnStart.disabled = false;
+    btnStop.style.display  = 'none';
+  }
+}
+
+// ── Card rendering ────────────────────────────────────────────────────────
+function createCard(sym) {
+  const grid = document.getElementById('mainGrid');
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.id = 'card-' + sym;
+  div.innerHTML = cardHTML(sym, null);
+  grid.appendChild(div);
+}
+
+function updateCard(sym) {
+  const card = document.getElementById('card-' + sym);
+  if (!card) return;
+  const d = symbolData[sym];
+  // Update card border class
+  card.className = 'card';
+  if (d?.pending_order) card.classList.add('pending');
+  else if (d?.position) {
+    card.classList.add((d.unrealised_pnl || 0) >= 0 ? 'in-pos-profit' : 'in-pos-loss');
+  }
+  card.innerHTML = cardHTML(sym, d);
+  // Re-render activity log
+  renderLog(sym);
+}
+
+function cardHTML(sym, d) {
+  const ltp     = d?.ltp || 0;
+  const chg     = d?.change || 0;
+  const pct     = d?.change_pct || 0;
+  const bias    = d?.bias || '';
+  const real    = d?.realised_pnl || 0;
+  const unreal  = d?.unrealised_pnl || 0;
+  const net     = real + unreal;
+  const pos     = d?.position;
+  const pending = d?.pending_order || false;
+  const snap    = d || {};
+
+  const ltpCls  = chg > 0 ? 'ltp-up' : chg < 0 ? 'ltp-down' : 'ltp-flat';
+  const biasCls = bias === 'BULLISH' ? 'bias-bull' : bias === 'BEARISH' ? 'bias-bear' : 'bias-none';
+  const biasTxt = bias === 'BULLISH' ? '▲ BULL' : bias === 'BEARISH' ? '▼ BEAR' : '— BIAS';
+  const chgCls  = pct >= 0 ? 'chg-pos' : 'chg-neg';
+
+  // Build order book depth rows
+  const bids = snap.bids_display || [];
+  const asks = snap.asks_display || [];
+
+  const posHTML = pending
+    ? `<div class="pending-badge"><div style="width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1s infinite"></div>⏳ Limit order pending — waiting for fill (5s)</div>`
+    : pos
+    ? `<div class="pos-grid">
+        <div class="pos-item"><div class="pl">Side</div><div class="pv ${pos.side==='BUY'?'side-buy':'side-sell'}">${pos.side}</div></div>
+        <div class="pos-item"><div class="pl">Entry</div><div class="pv">₹${pos.entry_price}</div></div>
+        <div class="pos-item"><div class="pl">Qty</div><div class="pv">${pos.qty}</div></div>
+        <div class="pos-item"><div class="pl">SL</div><div class="pv neg">₹${pos.stop}</div></div>
+        <div class="pos-item"><div class="pl">Target</div><div class="pv pos">₹${pos.target}</div></div>
+       </div>`
+    : `<span class="no-pos">No open position</span>`;
+
+  const imbal    = snap.imbalance || 0.5;
+  const imbalCls = imbal > 0.55 ? 'imbal-bull' : imbal < 0.45 ? 'imbal-bear' : 'imbal-neu';
+  const obReady  = snap.ob_ready ? '🟢 Live' : '⚪ Waiting';
+
+  return `
+    <div class="card-head">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="sym-name">${sym}</span>
+        <span class="${biasCls}">${biasTxt}</span>
+        ${obReady === '🟢 Live' ? '<span style="font-size:10px;background:#f0fdf4;color:var(--green);padding:2px 6px;border-radius:4px;font-weight:600">📖 OB Live</span>' : '<span style="font-size:10px;background:#f8f9fb;color:var(--muted);padding:2px 6px;border-radius:4px">📖 No Depth</span>'}
+      </div>
+      <div class="ltp-block">
+        <div class="ltp-val ${ltpCls}">₹${ltp ? Number(ltp).toFixed(2) : '—'}</div>
+        <span class="chg-pill ${chgCls}">${pct >= 0 ? '+' : ''}${Number(pct).toFixed(2)}%</span>
+      </div>
+    </div>
+    <div class="pnl-row">
+      <div class="pnl-cell"><div class="pnl-label">Realised</div><div class="pnl-val ${cls(real)}">${fmtPnl(real)}</div></div>
+      <div class="pnl-cell"><div class="pnl-label">Unrealised</div><div class="pnl-val ${cls(unreal)}">${fmtPnl(unreal)}</div></div>
+      <div class="pnl-cell"><div class="pnl-label">Net</div><div class="pnl-val ${cls(net)}">${fmtPnl(net)}</div></div>
+    </div>
+    <div class="ob-panel">
+      <div class="ob-title">
+        <span>Order Book Depth</span>
+        <span style="font-family:'DM Mono',monospace;font-size:11px">spread: ${snap.spread_pct ? snap.spread_pct.toFixed(4) : '—'}%</span>
+      </div>
+      <div class="ob-grid">
+        <div class="ob-side">
+          <div class="ob-side-title ob-bid-title">▲ BIDS</div>
+          ${obDepthRows(snap, 'bid')}
+        </div>
+        <div class="ob-side">
+          <div class="ob-side-title ob-ask-title">▼ ASKS</div>
+          ${obDepthRows(snap, 'ask')}
+        </div>
+      </div>
+      <div class="ob-metrics">
+        <div class="ob-metric">
+          <div class="ob-metric-label">Imbalance</div>
+          <div class="ob-metric-val ${imbalCls}">${(imbal * 100).toFixed(1)}%</div>
+        </div>
+        <div class="ob-metric">
+          <div class="ob-metric-label">Best Bid</div>
+          <div class="ob-metric-val pos">₹${snap.best_bid || '—'}</div>
+        </div>
+        <div class="ob-metric">
+          <div class="ob-metric-label">Best Ask</div>
+          <div class="ob-metric-val neg">₹${snap.best_ask || '—'}</div>
+        </div>
+        <div class="ob-metric">
+          <div class="ob-metric-label">Balance</div>
+          <div class="ob-metric-val neu">₹${snap.balance ? Math.round(snap.balance/1000) + 'k' : '50k'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-pos">${posHTML}</div>
+    <div class="card-log" id="log-${sym}">
+      <div class="log-title">Activity Log</div>
+      <div id="log-entries-${sym}"></div>
+    </div>`;
+}
+
+function obDepthRows(snap, side) {
+  // Pull bid/ask levels from status — top 5
+  const levels = side === 'bid'
+    ? (snap.bid_levels || [])
+    : (snap.ask_levels || []);
+
+  if (!levels.length) {
+    return `<div style="font-size:11px;color:var(--muted);text-align:center;padding:8px">No data</div>`;
+  }
+
+  const maxQty = Math.max(...levels.map(l => l[1] || 0)) || 1;
+  return levels.slice(0, 5).map(([price, qty]) => {
+    const barW = Math.round((qty / maxQty) * 100);
+    const barCls = side === 'bid' ? 'ob-bid-bar' : 'ob-ask-bar';
+    return `<div class="ob-level">
+      <div class="ob-level-bar ${barCls}" style="width:${barW}%"></div>
+      <span class="ob-price ${side === 'bid' ? 'pos' : 'neg'}">₹${Number(price).toFixed(2)}</span>
+      <span class="ob-qty">${qty}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────
+function addLog(sym, type, msg) {
+  if (!activityLog[sym]) activityLog[sym] = [];
+  const time = new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  activityLog[sym].unshift({ type, msg, time });
+  if (activityLog[sym].length > 20) activityLog[sym].pop();
+  renderLog(sym);
+}
+
+function renderLog(sym) {
+  const el = document.getElementById('log-entries-' + sym);
+  if (!el) return;
+  const logs = activityLog[sym] || [];
+  if (!logs.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);font-style:italic">No activity yet</div>';
+    return;
+  }
+  el.innerHTML = logs.map(l => `
+    <div class="log-entry ${l.type}">
+      <span class="log-time">${l.time}</span>${l.msg}
+    </div>`).join('');
+}
+
+// ── Portfolio update ──────────────────────────────────────────────────────
+function updatePortfolio(data) {
+  const real  = data.total_realised || 0;
+  const unr   = data.total_unreal   || 0;
+  const net   = data.total_net      || 0;
+
+  setEl('portReal',   fmtPnl(real),   'port-val ' + cls(real));
+  setEl('portUnreal', fmtPnl(unr),    'port-val ' + cls(unr));
+  setEl('portNet',    fmtPnl(net),    'port-val ' + cls(net));
+
+  // Compare panel
+  setEl('cmpOBNet', fmtPnl(net), 'compare-val ' + cls(net));
+}
+
+function updateStats() {
+  document.getElementById('portSig').textContent   = stats.signals;
+  document.getElementById('portFills').textContent  = stats.fills;
+  document.getElementById('cmpOBSig').textContent   = stats.signals;
+  const rate = stats.signals > 0 ? Math.round(stats.fills / stats.signals * 100) + '%' : '—';
+  setEl('cmpFillRate', rate, 'compare-val ' + (stats.fills > 0 ? 'pos' : 'neu'));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function fmtPnl(v) {
+  if (v == null) return '—';
+  return (v >= 0 ? '+' : '') + '₹' + Math.abs(Math.round(v)).toLocaleString('en-IN');
+}
+function cls(v) { return v == null ? 'neu' : v >= 0 ? 'pos' : 'neg'; }
+function setEl(id, text, className) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  if (className) el.className = className;
+}
+function toast(msg, dur=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+init();
+</script>
+</body>
+</html>

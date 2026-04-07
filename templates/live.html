@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StructureEngine — Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+<style>
+:root{
+  --bg:#f0f2f5;--surface:#fff;--border:#e2e6ea;--text:#1a1d23;--muted:#6b7280;
+  --blue:#0f6fff;--green:#16a34a;--red:#dc2626;--amber:#d97706;--purple:#7c3aed;
+  --surface2:#f8f9fb;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh;display:flex;flex-direction:column}
+.nav{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:14px;flex-shrink:0;position:sticky;top:0;z-index:100}
+.nav-logo{font-weight:600;font-size:14px;letter-spacing:.5px}
+.nav-badge{background:#fef3c7;color:#92400e;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:.5px}
+.nav-sep{width:1px;height:20px;background:var(--border)}
+.nav-tab{padding:6px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:500;font-size:13px}
+.nav-tab.active{background:#f0f4ff;color:var(--blue);font-weight:600}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#e2e6ea;transition:background .3s}
+.conn-dot.live{background:var(--green);box-shadow:0 0 6px rgba(22,163,74,.5)}
+.conn-dot.dead{background:var(--red)}
+.conn-label{font-size:11px;color:var(--muted);font-weight:500}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.toolbar{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.toolbar-left{display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap}
+.search-wrap{position:relative;flex:0 0 280px}
+.search-wrap input{width:100%;padding:8px 12px 8px 32px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--bg)}
+.search-wrap input:focus{outline:none;border-color:var(--blue)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px}
+.search-dd{position:absolute;top:38px;left:0;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.1);z-index:200;max-height:240px;overflow-y:auto;display:none}
+.search-dd.open{display:block}
+.search-item{padding:9px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);font-size:12px}
+.search-item:last-child{border-bottom:none}
+.search-item:hover{background:var(--bg)}
+.search-sym{font-weight:600}
+.search-seg{font-size:10px;color:var(--muted);background:var(--bg);padding:2px 6px;border-radius:4px}
+.locked-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;background:#f5f0ff;border:1px solid #e9d5ff;font-size:12px;color:var(--purple);font-weight:500}
+.btn{padding:8px 16px;border-radius:8px;border:none;font-weight:600;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .15s;display:flex;align-items:center;gap:6px}
+.btn:hover{opacity:.88}
+.btn-start{background:var(--green);color:#fff}
+.btn-start.running{background:var(--muted)}
+.btn-back{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.port-bar{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-bottom:1px solid var(--border);padding:0}
+.port-cell{padding:10px 16px;border-right:1px solid var(--border);text-align:center}
+.port-cell:last-child{border-right:none}
+.port-label{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px}
+.port-val{font-size:15px;font-weight:700;font-family:'DM Mono',monospace}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;padding:16px;flex:1}
+.card{background:var(--surface);border-radius:12px;border:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .2s,order .4s}
+.card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.card.kill-on{border-color:var(--red);border-width:2px}
+/* position cards get a subtle left border highlight */
+.card.in-pos-card{border-left:3px solid var(--blue)}
+.card.in-pos-card.profit-card{border-left:3px solid var(--green)}
+.card.in-pos-card.loss-card{border-left:3px solid var(--red)}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
+.card-sym{font-weight:700;font-size:14px;letter-spacing:.3px}
+.card-ltp{font-family:'DM Mono',monospace;font-size:13px;font-weight:600}
+.bias-bull{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;background:#dcfce7;color:#15803d;letter-spacing:.4px}
+.bias-bear{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;background:#fee2e2;color:#b91c1c;letter-spacing:.4px}
+.bias-none{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:#f1f5f9;color:#94a3b8;letter-spacing:.4px}
+.card-status{display:flex;align-items:center;gap:6px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.status-dot.in-pos{background:var(--blue);box-shadow:0 0 5px rgba(15,111,255,.5);animation:pulse 1.5s ease-in-out infinite}
+.status-dot.kill{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-txt{font-size:11px;color:var(--muted);font-weight:500}
+.remove-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.remove-btn:hover{background:#fee2e2;border-color:#fca5a5;color:var(--red)}
+.card-pnl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid var(--border)}
+.pnl-cell{padding:10px 14px;text-align:center;border-right:1px solid var(--border)}
+.pnl-cell:last-child{border-right:none}
+.pnl-label{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.3px;text-transform:uppercase;margin-bottom:2px}
+.pnl-val{font-size:14px;font-weight:700;font-family:'DM Mono',monospace}
+.card-pos{padding:10px 14px;border-bottom:1px solid var(--border);min-height:48px;display:flex;align-items:center}
+.no-pos{color:var(--muted);font-size:11px;font-style:italic}
+.pos-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;width:100%}
+.pos-item .pl{font-size:10px;color:var(--muted);font-weight:500;margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px}
+.pos-item .pv{font-size:12px;font-weight:600;font-family:'DM Mono',monospace}
+.side-buy{color:var(--blue)}.side-sell{color:var(--red)}
+.card-kill{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:11px}
+.kill-off{color:var(--muted)}
+.kill-active{color:var(--green);font-weight:600}
+.kill-fired{color:var(--red);font-weight:600;animation:blink 1s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.kill-bar-wrap{flex:1;margin:0 10px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
+.kill-bar{height:100%;border-radius:2px;background:var(--green);transition:width .5s}
+.card-log{padding:10px 14px;flex:1}
+.log-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;justify-content:space-between}
+.log-table{width:100%;border-collapse:collapse;font-size:11px}
+.log-table th{color:var(--muted);font-weight:500;padding:3px 0;text-align:left;border-bottom:1px solid var(--border)}
+.log-table td{padding:4px 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace}
+.log-table tr:last-child td{border-bottom:none}
+.log-buy{color:var(--blue)}.log-sell{color:var(--red)}
+.log-pos{color:var(--green)}.log-neg{color:var(--red)}
+.no-trades{color:var(--muted);font-size:11px;font-style:italic;padding:6px 0}
+.card-loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted);gap:8px;font-size:12px}
+.mini-spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--muted);text-align:center;gap:12px}
+.empty-icon{font-size:48px;opacity:.3}
+.empty-title{font-size:16px;font-weight:600;color:var(--text)}
+.empty-sub{font-size:12px;max-width:300px;line-height:1.6}
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1d23;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:999}
+.toast.show{opacity:1;transform:translateY(0)}
+.ltl-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:700;display:none;align-items:flex-end}
+.ltl-overlay.open{display:flex}
+.ltl-drawer{width:100%;max-height:80vh;background:#fff;border-radius:16px 16px 0 0;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.18);animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.ltl-head{padding:14px 18px;background:linear-gradient(135deg,#c53030,#e53e3e,#fc8181);border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between}
+.ltl-sym{font-size:16px;font-weight:800;color:#fff}
+.ltl-badge{background:rgba(255,255,255,.2);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;border:1px solid rgba(255,255,255,.3)}
+.ltl-badge.live{background:rgba(255,255,255,.3)}
+.ltl-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:15px}
+.ltl-close:hover{background:rgba(255,255,255,.35)}
+.ltl-date-bar{padding:8px 18px;background:#f7f8fa;border-bottom:1px solid #e8eaed;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.ltl-date-bar label{font-size:11px;font-weight:600;color:#6b7280}
+.ltl-date{padding:5px 10px;border:1px solid #e8eaed;border-radius:6px;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer}
+.ltl-date:focus{outline:none;border-color:#e53e3e}
+.ltl-summary{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid #e8eaed;flex-shrink:0}
+.ltl-stat{padding:9px 12px;text-align:center;border-right:1px solid #e8eaed}
+.ltl-stat:last-child{border-right:none}
+.ltl-sl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin-bottom:2px}
+.ltl-sv{font-size:14px;font-weight:700;font-family:'DM Mono',monospace}
+.ltl-body{flex:1;overflow-y:auto}
+.ltl-body::-webkit-scrollbar{width:4px}
+.ltl-body::-webkit-scrollbar-thumb{background:#e8eaed;border-radius:2px}
+.ltl-empty{padding:50px;text-align:center;color:#6b7280;font-size:13px}
+.ltl-loading{padding:50px;text-align:center;color:#6b7280;display:flex;align-items:center;justify-content:center;gap:8px}
+.ltl-spin{width:16px;height:16px;border:2px solid #e8eaed;border-top-color:#e53e3e;border-radius:50%;animation:spin .7s linear infinite}
+table.ltl-table{width:100%;border-collapse:collapse;font-size:12px}
+.ltl-table thead th{position:sticky;top:0;background:#fff5f5;padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;border-bottom:2px solid #fca5a5;white-space:nowrap}
+.ltl-table tbody tr{border-bottom:1px solid #e8eaed;transition:background .1s}
+.ltl-table tbody tr:hover{background:#fff5f5}
+.ltl-table td{padding:9px 14px;font-family:'DM Mono',monospace;white-space:nowrap}
+.ltl-table td.buy{color:#2563eb;font-weight:700}
+.ltl-table td.sell{color:#e53e3e;font-weight:700}
+.ltl-table td.pos{color:#16a34a;font-weight:600}
+.ltl-table td.neg{color:#e53e3e;font-weight:600}
+.ltl-table td.muted{color:#6b7280}
+.ltl-footer{padding:8px 18px;background:#f7f8fa;border-top:1px solid #e8eaed;font-size:11px;color:#6b7280;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.btn-tradelog{width:100%;padding:7px;border-radius:7px;border:1px solid #fca5a5;background:#fff5f5;color:#c53030;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-top:6px;transition:all .15s}
+.btn-tradelog:hover{background:#fee2e2}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="nav-logo">STRUCTUREENGINE</span>
+  <span class="nav-badge">LIVE PAPER</span>
+  <div class="nav-sep"></div>
+  <div class="nav-tab" onclick="location.href='/'">📈 Backtest</div>
+  <div class="nav-tab active">⏱ Live</div>
+  <div class="nav-tab" onclick="location.href='/heatmap'">🔥 Heatmap</div>
+  <div class="nav-tab" onclick="location.href='/signals'">📡 Signals</div>
+  <div class="nav-tab" onclick="location.href='/ob'">📖 OB</div>
+  <div class="conn-dot" id="connDot"></div>
+  <span class="conn-label" id="connLabel">Disconnected</span>
+  <div class="nav-right">
+    <button class="btn btn-back" onclick="location.href='/'">← Backtest</button>
+  </div>
+</nav>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <div class="search-wrap" id="searchWrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="symSearch" placeholder="Search symbol to add (NSE EQ / F&O)…"
+             oninput="onSearch()" onblur="setTimeout(()=>closeDD(),200)">
+      <div class="search-dd" id="searchDD"></div>
+    </div>
+    <div class="locked-chip" id="lockedChip">🔒 Loading…</div>
+  </div>
+  <button class="btn btn-start" id="btnStart" onclick="startAll()">▶ Start All</button>
+  <button class="btn" id="btnStop" onclick="stopEngine()" style="display:none;background:#dc2626;color:#fff;margin-left:8px">⏹ Stop Engine</button>
+</div>
+
+<div class="port-bar">
+  <div class="port-cell"><div class="port-label">Total Balance</div><div class="port-val" id="portBal">—</div></div>
+  <div class="port-cell"><div class="port-label">Net PnL (Today)</div><div class="port-val" id="portNet">—</div></div>
+  <div class="port-cell"><div class="port-label">Unrealised</div><div class="port-val" id="portUnreal">—</div></div>
+  <div class="port-cell"><div class="port-label">Symbols Active</div><div class="port-val" id="portSym">—</div></div>
+  <div class="port-cell"><div class="port-label">Trades Today</div><div class="port-val" id="portTrd">—</div></div>
+</div>
+
+<div class="grid" id="symGrid">
+  <div class="empty-state">
+    <div class="empty-icon">📊</div>
+    <div class="empty-title">No symbols added yet</div>
+    <div class="empty-sub">Search for a symbol above to add it to the live paper engine, then click Start All.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const socket = io();
+let engineRunning = false;
+let symbolData = {};
+let instruments = [];
+
+/* ── Dynamic card sorting ────────────────────────────────────────────────────
+   Sort order (re-runs every live_update = every 0.5s):
+   1. In Position + profitable  (unrealised > 0) — sorted profit high→low
+   2. In Position + loss        (unrealised <= 0) — sorted loss small→big
+   3. Watching                  — sorted by |net pnl| so active symbols float up
+*/
+function sortCards() {
+  const grid = document.getElementById('symGrid');
+  const cards = Array.from(grid.querySelectorAll('.card'));
+  if (cards.length === 0) return;
+
+  // Score each card for sort order
+  cards.sort((a, b) => {
+    const sa = symbolData[a.id.replace('card-', '')] || {};
+    const sb = symbolData[b.id.replace('card-', '')] || {};
+
+    const aPos = !!sa.position;
+    const bPos = !!sb.position;
+    const aUnreal = sa.unrealised_pnl || 0;
+    const bUnreal = sb.unrealised_pnl || 0;
+    const aNet = (sa.realised_pnl || 0) + aUnreal;
+    const bNet = (sb.realised_pnl || 0) + bUnreal;
+
+    // Group 1: in position + profitable
+    const aG1 = aPos && aUnreal > 0;
+    const bG1 = bPos && bUnreal > 0;
+    // Group 2: in position + loss/flat
+    const aG2 = aPos && aUnreal <= 0;
+    const bG2 = bPos && bUnreal <= 0;
+    // Group 3: watching
+
+    const aGroup = aG1 ? 0 : aG2 ? 1 : 2;
+    const bGroup = bG1 ? 0 : bG2 ? 1 : 2;
+
+    if (aGroup !== bGroup) return aGroup - bGroup;
+
+    // Within group 1: highest profit first
+    if (aGroup === 0) return bUnreal - aUnreal;
+    // Within group 2: smallest loss first (closest to breakeven)
+    if (aGroup === 1) return bUnreal - aUnreal;
+    // Within group 3: highest |net pnl| first (active symbols float up)
+    return Math.abs(bNet) - Math.abs(aNet);
+  });
+
+  // Update card border classes based on position state
+  cards.forEach(card => {
+    const sym = card.id.replace('card-', '');
+    const d = symbolData[sym] || {};
+    card.classList.remove('in-pos-card', 'profit-card', 'loss-card');
+    if (d.position) {
+      card.classList.add('in-pos-card');
+      if ((d.unrealised_pnl || 0) > 0) card.classList.add('profit-card');
+      else card.classList.add('loss-card');
+    }
+  });
+
+  // Re-order DOM nodes efficiently (no innerHTML)
+  cards.forEach(card => grid.appendChild(card));
+}
+
+/* ── Init ────────────────────────────────────────────────────────── */
+fetch('/get_instruments').then(r=>r.json()).then(list=>{
+  instruments = list;
+  list.forEach(i=>addCardToGrid(i.symbol));
+  seedQuotes();
+  fetch('/live_status').then(r=>r.json()).then(d=>{
+    if(d && d.instruments && d.instruments.length){
+      engineRunning = true;
+      startLtpPoll();
+      const b = document.getElementById('btnStart');
+      if(b){ b.textContent='⏹ Running…'; b.className='btn btn-start running'; }
+      d.instruments.forEach(inst=>{
+        symbolData[inst.symbol] = inst;
+        updateCard(inst);
+        updateBiasBadge(inst.symbol, inst.bias);
+      });
+      updatePortfolio(d);
+      sortCards();
+    }
+  }).catch(()=>{});
+});
+
+function seedQuotes(){
+  fetch('/quotes').then(r=>r.json()).then(data=>{
+    Object.keys(data).forEach(sym => {
+      const q = data[sym];
+      if(!q || !q.ltp) return;
+      const existing = symbolData[sym] || {};
+      if(engineRunning && existing.ltp != null) return;
+      symbolData[sym] = Object.assign({}, existing, {
+        symbol: sym, ltp: q.ltp,
+        prev_close: q.prev_close, change: q.change, change_pct: q.change_pct,
+      });
+      const card = document.getElementById('card-'+sym);
+      if(card) card.innerHTML = cardHTML(sym, symbolData[sym]);
+    });
+  }).catch(e => console.error('[seedQuotes] error:', e));
+}
+
+setInterval(()=>{ if(!engineRunning) seedQuotes(); }, 2000);
+fetch('/locked_config').then(r=>r.json()).then(c=>{
+  document.getElementById('lockedChip').textContent =
+    c && c.name ? '🔒 '+c.name+' · risk='+c.risk_per_trade+' rr='+c.rr_target+' cd='+c.cooldown : '🔒 No config locked';
+});
+
+/* ── SocketIO events ─────────────────────────────────────────────── */
+socket.on('connect',    ()=>setConn(true));
+socket.on('disconnect', ()=>setConn(false));
+
+socket.on('live_update', data=>{
+  setConn(data.connected);
+  if(data.instruments){
+    engineRunning = true;
+    startLtpPoll();
+    data.instruments.forEach(inst => {
+      symbolData[inst.symbol] = inst;
+      updateCard(inst);
+      updateBiasBadge(inst.symbol, inst.bias);
+    });
+    updatePortfolio(data);
+    sortCards();  // ← re-sort on every live_update (every 0.5s)
+  }
+});
+
+socket.on('tick_update', tick=>{
+  if(!tick.symbol || tick.ltp == null) return;
+  const sym = tick.symbol;
+  if(symbolData[sym]){
+    symbolData[sym].ltp        = tick.ltp;
+    symbolData[sym].prev_close = tick.prev_close;
+    symbolData[sym].change     = tick.change;
+    symbolData[sym].change_pct = tick.change_pct;
+  }
+  updateLtpFast(sym, tick);
+});
+
+socket.on('engine_stopped', ()=>{
+  engineRunning = false;
+  const b = document.getElementById('btnStart');
+  if(b){ b.textContent='▶ Start All'; b.className='btn btn-start'; }
+  const s = document.getElementById('btnStop');
+  if(s) s.style.display='none';
+  toast('⏹ Engine stopped');
+  seedQuotes();
+});
+
+function updateLtpFast(sym, tick){
+  const ltpEl = document.getElementById('ltp-'+sym);
+  const pctEl = document.getElementById('pct-'+sym);
+  const chgEl = document.getElementById('chg-'+sym);
+  if(ltpEl){
+    ltpEl.textContent = '₹'+Number(tick.ltp).toFixed(2);
+    if(tick.change != null) ltpEl.style.color = tick.change >= 0 ? '#16a34a' : '#dc2626';
+  }
+  if(pctEl){
+    const sign = tick.change_pct >= 0 ? '+' : '';
+    pctEl.textContent = sign+Number(tick.change_pct).toFixed(2)+'%';
+    pctEl.style.color = tick.change_pct >= 0 ? '#16a34a' : '#dc2626';
+    pctEl.style.background = tick.change_pct >= 0 ? '#dcfce7' : '#fee2e2';
+  }
+  if(chgEl){
+    chgEl.textContent = (tick.change>=0?'+':'')+Number(tick.change).toFixed(2);
+    chgEl.style.color = tick.change >= 0 ? '#16a34a' : '#dc2626';
+  }
+}
+
+let _ltpPollInterval = null;
+function startLtpPoll(){
+  if(_ltpPollInterval) return;
+  _ltpPollInterval = setInterval(()=>{
+    if(!engineRunning){ clearInterval(_ltpPollInterval); _ltpPollInterval=null; return; }
+    fetch('/quotes').then(r=>r.json()).then(data=>{
+      Object.entries(data).forEach(([sym,q])=>{
+        if(!q||q.ltp==null) return;
+        if(symbolData[sym]) {
+          symbolData[sym].ltp        = q.ltp;
+          symbolData[sym].prev_close = q.prev_close;
+          symbolData[sym].change     = q.change;
+          symbolData[sym].change_pct = q.change_pct;
+        }
+        updateLtpFast(sym, q);
+      });
+    }).catch(()=>{});
+  }, 500);
+}
+
+socket.on('engine_starting', data=>{
+  const b=document.getElementById('btnStart');
+  b.textContent='⏳ Starting…'; b.className='btn btn-start running';
+  toast('📜 Replaying history + connecting WS…');
+});
+
+socket.on('engine_started', data=>{
+  engineRunning=true;
+  const b=document.getElementById('btnStart');
+  b.textContent='⏹ Running…'; b.className='btn btn-start running';
+  const s=document.getElementById('btnStop');
+  if(s) s.style.display='inline-flex';
+  toast('✅ Engine running — bias loaded');
+  startLtpPoll();
+  if(data && data.instruments){
+    data.instruments.forEach(inst=>{
+      symbolData[inst.symbol] = inst;
+      updateCard(inst);
+      updateBiasBadge(inst.symbol, inst.bias);
+    });
+    sortCards();
+  }
+});
+
+socket.on('engine_error', data=>{
+  toast('❌ ' + (data.msg || 'Engine failed to start'), 5000);
+});
+
+function setConn(ok){
+  document.getElementById('connDot').className='conn-dot '+(ok?'live':'dead');
+  document.getElementById('connLabel').textContent=ok?'Live':'Disconnected';
+}
+
+function startAll(){
+  if(engineRunning){ toast('Engine already running'); return; }
+  if(instruments.length===0){ toast('Add at least one symbol first'); return; }
+  engineRunning = true;
+  socket.emit('start_all');
+  toast('⏳ Starting engine…');
+}
+
+function stopEngine(){
+  if(!engineRunning){ toast('Engine not running'); return; }
+  socket.emit('stop_engine');
+  toast('⏳ Stopping engine…');
+}
+
+let _searchTimer = null;
+function onSearch(){
+  clearTimeout(_searchTimer);
+  const q = document.getElementById('symSearch').value.trim();
+  if(q.length<2){ closeDD(); return; }
+  _searchTimer = setTimeout(()=>{
+    fetch('/search_instruments?q='+encodeURIComponent(q))
+    .then(r=>r.json())
+    .then(results=>{
+      const dd = document.getElementById('searchDD');
+      if(!results.length){ dd.innerHTML='<div style="padding:10px 12px;color:var(--muted);font-size:12px">No results</div>'; }
+      else {
+        dd.innerHTML = results.map(r=>`
+          <div class="search-item" onclick="addSymbol('${r.symbol}','${r.token}','${r.segment}')">
+            <span><span class="search-sym">${r.symbol}</span> <span style="color:var(--muted);font-size:11px">${r.name||''}</span></span>
+            <span class="search-seg">${r.segment||''}</span>
+          </div>`).join('');
+      }
+      dd.classList.add('open');
+    });
+  },300);
+}
+function closeDD(){ document.getElementById('searchDD').classList.remove('open'); }
+
+function addSymbol(symbol, token, segment){
+  closeDD();
+  document.getElementById('symSearch').value='';
+  if(instruments.find(i=>i.symbol===symbol)){
+    toast(symbol+' already added'); return;
+  }
+  fetch('/add_symbol',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbol,token,margin_pct:0.20})})
+  .then(r=>r.json())
+  .then(()=>{
+    instruments.push({symbol,token,segment});
+    addCardToGrid(symbol);
+    toast('✅ '+symbol+' added');
+  });
+}
+
+function removeSymbol(symbol){
+  fetch('/remove_symbol',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbol})})
+  .then(()=>{
+    instruments = instruments.filter(i=>i.symbol!==symbol);
+    const card = document.getElementById('card-'+symbol);
+    if(card) card.remove();
+    delete symbolData[symbol];
+    checkEmptyState();
+  });
+}
+
+function checkEmptyState(){
+  const grid = document.getElementById('symGrid');
+  const cards = grid.querySelectorAll('.card');
+  if(cards.length===0){
+    grid.innerHTML=`<div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">No symbols added yet</div>
+      <div class="empty-sub">Search for a symbol above to add it to the live paper engine, then click Start All.</div>
+    </div>`;
+  }
+}
+
+function addCardToGrid(symbol){
+  const grid = document.getElementById('symGrid');
+  const empty = grid.querySelector('.empty-state');
+  if(empty) empty.remove();
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'card-'+symbol;
+  card.innerHTML = cardHTML(symbol, null);
+  grid.appendChild(card);
+}
+
+function cardHTML(symbol, d){
+  const ltp    = d?.ltp   ?? null;
+  const real   = d?.realised_pnl ?? null;
+  const unreal = d?.unrealised_pnl ?? null;
+  const net    = (real||0)+(unreal||0);
+  const pos    = d?.position ?? null;
+  const ks     = d?.kill_switch ?? null;
+  const trades = d?.daily_trades ?? [];
+  const inPos  = !!pos;
+  const killed = ks?.triggered ?? false;
+
+  const fmtP  = v=>v==null?'—':(v>=0?'+':'')+Math.round(v);
+  const cls   = v=>v==null?'neu':v>=0?'pos':'neg';
+
+  const killBar = ks ? Math.min(100,Math.max(0,(ks.peak>0?(ks.current/ks.peak)*100:100))) : 100;
+  const killTxt = killed ? '🔴 KILL SWITCH FIRED' :
+                  ks ? `🟢 Peak ₹${Math.round(ks.peak/1000)}k · Threshold ${Math.round((ks.percent||0.9)*100)}%` :
+                  'Kill switch — idle';
+
+  const posHTML = inPos ? `
+    <div class="pos-grid">
+      <div class="pos-item"><div class="pl">Side</div><div class="pv ${pos.side==='BUY'?'side-buy':'side-sell'}">${pos.side}</div></div>
+      <div class="pos-item"><div class="pl">Entry</div><div class="pv">₹${pos.entry_price}</div></div>
+      <div class="pos-item"><div class="pl">Qty</div><div class="pv">${pos.qty}</div></div>
+      <div class="pos-item"><div class="pl">SL</div><div class="pv neg">₹${pos.stop}</div></div>
+      <div class="pos-item"><div class="pl">Target</div><div class="pv pos">₹${pos.target}</div></div>
+    </div>` : `<span class="no-pos">No open position</span>`;
+
+  const tradesHTML = trades.length===0 ? `<div class="no-trades">No trades today</div>` :
+    `<table class="log-table">
+      <thead><tr><th>Dir</th><th>Entry</th><th>Exit</th><th>Qty</th><th>Net PnL</th><th>Reason</th></tr></thead>
+      <tbody>${trades.slice(-5).reverse().map(t=>`<tr>
+        <td class="${t.direction==='BUY'?'log-buy':'log-sell'}">${t.direction}</td>
+        <td>${String(t.entry_time).slice(11,16)}</td>
+        <td>${String(t.exit_time).slice(11,16)}</td>
+        <td>${t.qty}</td>
+        <td class="${t.net_pnl>=0?'log-pos':'log-neg'}">${t.net_pnl>=0?'+':''}${Math.round(t.net_pnl)}</td>
+        <td style="color:var(--muted)">${t.reason||''}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+
+  return `
+    <div class="card-head">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <div class="card-sym">${symbol}</div>
+          ${d?.bias==='BULLISH'
+            ? `<span class="bias-bull">▲ BULL</span>`
+            : d?.bias==='BEARISH'
+            ? `<span class="bias-bear">▼ BEAR</span>`
+            : `<span class="bias-none">— NO BIAS</span>`}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+          <div id="ltp-${symbol}" class="card-ltp ${d?.change!=null?cls(d.change):'neu'}" style="font-size:16px;font-weight:700">${ltp?'₹'+ltp:'—'}</div>
+          ${d?.change_pct!=null?`<span id="pct-${symbol}" class="card-pct ${d.change_pct>=0?'pos':'neg'}" style="font-size:11px;font-weight:700;padding:2px 6px;border-radius:5px;background:${d.change_pct>=0?'#dcfce7':'#fee2e2'};color:${d.change_pct>=0?'#16a34a':'#dc2626'}">${d.change_pct>=0?'+':''}${d.change_pct.toFixed(2)}%</span>`:''}
+          ${d?.change!=null?`<span id="chg-${symbol}" style="font-size:11px;color:${d.change>=0?'#16a34a':'#dc2626'};font-weight:600">${d.change>=0?'+':''}${d.change.toFixed(2)}</span>`:''}
+        </div>
+      </div>
+      <div class="card-status">
+        <div class="status-dot ${killed?'kill':inPos?'in-pos':''}"></div>
+        <span class="status-txt">${killed?'Halted':inPos?'In Position':'Watching'}</span>
+        <button class="remove-btn" onclick="removeSymbol('${symbol}')" title="Remove">✕</button>
+      </div>
+    </div>
+    <div class="card-pnl">
+      <div class="pnl-cell"><div class="pnl-label">Realised</div><div class="pnl-val ${cls(real)}">${fmtP(real)}</div></div>
+      <div class="pnl-cell"><div class="pnl-label">Unrealised</div><div class="pnl-val ${cls(unreal)}">${fmtP(unreal)}</div></div>
+      <div class="pnl-cell"><div class="pnl-label">Net</div><div class="pnl-val ${cls(net)}">${fmtP(net)}</div></div>
+    </div>
+    <div class="card-pos">${posHTML}</div>
+    <div class="card-kill ${killed?'kill-fired':ks?'kill-active':'kill-off'}">
+      <span>${killTxt}</span>
+      <div class="kill-bar-wrap"><div class="kill-bar" style="width:${killBar}%;background:${killed?'var(--red)':killBar<50?'var(--amber)':'var(--green)'}"></div></div>
+    </div>
+    <div class="card-log">
+      <div class="log-title"><span>Today's Trades</span><span>${trades.length} trades</span></div>
+      ${tradesHTML}
+    </div>
+    <button class="btn-tradelog" onclick="openLTL('${symbol}')">📋 Full Trade Log (DB)</button>`;
+}
+
+function updateCard(d){
+  const symbol = d.symbol;
+  symbolData[symbol] = d;
+  const card = document.getElementById('card-'+symbol);
+  if(!card) return;
+  const killed = d?.kill_switch?.triggered ?? false;
+  card.className = 'card'+(killed?' kill-on':'');
+  card.innerHTML = cardHTML(symbol, d);
+}
+
+function updateBiasBadge(sym, bias){
+  const card = document.getElementById('card-'+sym);
+  if(!card) return;
+  const badge = card.querySelector('.bias-bull, .bias-bear, .bias-none');
+  if(!badge) return;
+  if(bias === 'BULLISH'){ badge.className='bias-bull'; badge.textContent='▲ BULL'; }
+  else if(bias === 'BEARISH'){ badge.className='bias-bear'; badge.textContent='▼ BEAR'; }
+  else { badge.className='bias-none'; badge.textContent='— NO BIAS'; }
+}
+
+function updatePortfolio(data){
+  if(!data.instruments) return;
+  const syms = data.instruments;
+  const totalBal  = syms.reduce((s,d)=>s+(d.balance||0),0);
+  const totalNet  = syms.reduce((s,d)=>s+(d.realised_pnl||0),0);
+  const totalUnr  = syms.reduce((s,d)=>s+(d.unrealised_pnl||0),0);
+  const totalTrd  = syms.reduce((s,d)=>s+(d.daily_trades?.length||0),0);
+  const active    = syms.filter(d=>d.position).length;
+  const fmt = v=>(v>=0?'+':'')+Math.round(v);
+  const cls = v=>v>=0?'pos':'neg';
+  document.getElementById('portBal').textContent   = '₹'+Math.round(totalBal/1000)+'k';
+  document.getElementById('portNet').textContent   = '₹'+fmt(totalNet);
+  document.getElementById('portNet').className     = 'port-val '+cls(totalNet);
+  document.getElementById('portUnreal').textContent= '₹'+fmt(totalUnr);
+  document.getElementById('portUnreal').className  = 'port-val '+cls(totalUnr);
+  document.getElementById('portSym').textContent   = active+' / '+syms.length;
+  document.getElementById('portTrd').textContent   = totalTrd;
+}
+
+function toast(msg,dur=3000){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+/* ── Live Trade Log Drawer ───────────────────────────────────────── */
+let _ltlSym = '';
+function openLTL(symbol){
+  _ltlSym = symbol;
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('ltlSym').textContent  = symbol;
+  document.getElementById('ltlDate').value        = today;
+  document.getElementById('ltlDateLabel').textContent = '';
+  document.getElementById('ltlOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  ltlFetch(symbol, today);
+}
+function ltlChangeDate(){ const d=document.getElementById('ltlDate').value; if(d) ltlFetch(_ltlSym,d); }
+function ltlLoadAll(){ document.getElementById('ltlDate').value=''; document.getElementById('ltlDateLabel').textContent='(all history)'; ltlFetch(_ltlSym,'all'); }
+function ltlFetch(symbol, date){
+  const body = document.getElementById('ltlBody');
+  body.innerHTML = '<div class="ltl-loading"><div class="ltl-spin"></div> Loading from DB…</div>';
+  ['ltlTotal','ltlWins','ltlLoss','ltlWR','ltlNet','ltlChg'].forEach(id=>{ document.getElementById(id).textContent='—'; });
+  fetch(`/live_trades/${encodeURIComponent(symbol)}?date=${encodeURIComponent(date)}`).then(r=>r.json()).then(data=>{
+    const trades=data.trades||[]; const summary=data.summary||{};
+    document.getElementById('ltlTotal').textContent=summary.total??0;
+    document.getElementById('ltlWins').textContent=summary.wins??0;
+    document.getElementById('ltlLoss').textContent=summary.losses??0;
+    document.getElementById('ltlWR').textContent=(summary.win_rate??0)+'%';
+    const net=summary.net_pnl??0;
+    const netEl=document.getElementById('ltlNet');
+    netEl.textContent=(net>=0?'+':'')+Math.round(net);
+    netEl.className='ltl-sv '+(net>=0?'pos':'neg');
+    document.getElementById('ltlChg').textContent='₹'+Math.round(summary.charges??0);
+    document.getElementById('ltlFooter').textContent=`${trades.length} trades · ${date==='all'?'all history':date} · saved to DB on close`;
+    if(trades.length===0){ body.innerHTML=`<div class="ltl-empty">No live trades found for ${symbol} on ${date==='all'?'any date':date}</div>`; return; }
+    body.innerHTML=`<table class="ltl-table"><thead><tr><th>#</th><th>Dir</th><th>Entry Time</th><th>Exit Time</th><th>Entry ₹</th><th>Exit ₹</th><th>Qty</th><th>Gross</th><th>Charges</th><th>Net PnL</th><th>Reason</th></tr></thead><tbody>
+      ${trades.map((t,i)=>{const buy=t.direction==='BUY';const nc=t.net_pnl>=0?'pos':'neg';const gc=t.gross_pnl>=0?'pos':'neg';
+        return `<tr><td class="muted">${i+1}</td><td class="${buy?'buy':'sell'}">${t.direction}</td><td class="muted">${String(t.entry_time||'').slice(0,16)}</td><td class="muted">${String(t.exit_time||'').slice(0,16)}</td><td>${t.entry_price}</td><td>${t.exit_price}</td><td>${t.qty}</td><td class="${gc}">${t.gross_pnl>=0?'+':''}${Math.round(t.gross_pnl)}</td><td class="neg">₹${Math.round(t.charges)}</td><td class="${nc}">${t.net_pnl>=0?'+':''}${Math.round(t.net_pnl)}</td><td class="muted" style="font-size:11px">${t.reason||''}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }).catch(e=>{ body.innerHTML=`<div class="ltl-empty">Error: ${e.message}</div>`; });
+}
+function closeLTL(e){ if(e.target===document.getElementById('ltlOverlay')) closeLTLBtn(); }
+function closeLTLBtn(){ document.getElementById('ltlOverlay').classList.remove('open'); document.body.style.overflow=''; }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLTLBtn(); });
+</script>
+
+<div class="ltl-overlay" id="ltlOverlay" onclick="closeLTL(event)">
+  <div class="ltl-drawer" onclick="event.stopPropagation()">
+    <div class="ltl-head">
+      <div>
+        <span class="ltl-sym" id="ltlSym">—</span>
+        <span class="ltl-badge live">LIVE</span>
+        <span class="ltl-badge">from DB</span>
+      </div>
+      <button class="ltl-close" onclick="closeLTLBtn()">✕</button>
+    </div>
+    <div class="ltl-date-bar">
+      <label>Date:</label>
+      <input type="date" class="ltl-date" id="ltlDate" onchange="ltlChangeDate()">
+      <button onclick="ltlLoadAll()" style="padding:5px 12px;border-radius:6px;border:1px solid #e8eaed;background:#fff;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif">All history</button>
+      <span id="ltlDateLabel" style="font-size:11px;color:#6b7280;margin-left:4px"></span>
+    </div>
+    <div class="ltl-summary">
+      <div class="ltl-stat"><div class="ltl-sl">Trades</div><div class="ltl-sv" id="ltlTotal">—</div></div>
+      <div class="ltl-stat"><div class="ltl-sl">Wins</div><div class="ltl-sv pos" id="ltlWins">—</div></div>
+      <div class="ltl-stat"><div class="ltl-sl">Losses</div><div class="ltl-sv neg" id="ltlLoss">—</div></div>
+      <div class="ltl-stat"><div class="ltl-sl">Win Rate</div><div class="ltl-sv" id="ltlWR">—</div></div>
+      <div class="ltl-stat"><div class="ltl-sl">Net PnL</div><div class="ltl-sv" id="ltlNet">—</div></div>
+      <div class="ltl-stat"><div class="ltl-sl">Charges</div><div class="ltl-sv neg" id="ltlChg">—</div></div>
+    </div>
+    <div class="ltl-body" id="ltlBody">
+      <div class="ltl-loading"><div class="ltl-spin"></div> Loading from DB…</div>
+    </div>
+    <div class="ltl-footer">
+      <span id="ltlFooter">Saved to DB on every trade close</span>
+      <span>Backtest trades → Backtest tab</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

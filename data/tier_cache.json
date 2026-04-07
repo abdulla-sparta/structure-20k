@@ -1,0 +1,226 @@
+{
+  "TRENT": {
+    "symbol": "TRENT",
+    "tier": 1,
+    "gc_ratio": 7.141,
+    "label": "Tier 1 \u2014 Strong trend",
+    "classified_at": "2026-03-07 05:10:39",
+    "optimal_cooldown": 30
+  },
+  "CUMMINSIND": {
+    "symbol": "CUMMINSIND",
+    "tier": 1,
+    "gc_ratio": 3.516,
+    "label": "Tier 1 \u2014 Strong trend",
+    "classified_at": "2026-03-07 05:10:39",
+    "optimal_cooldown": 30
+  },
+  "M&M": {
+    "symbol": "M&M",
+    "tier": 1,
+    "gc_ratio": 2.926,
+    "label": "Tier 1 \u2014 Strong trend",
+    "classified_at": "2026-03-07 05:10:39",
+    "optimal_cooldown": 30
+  },
+  "BHARTIARTL": {
+    "symbol": "BHARTIARTL",
+    "tier": 3,
+    "gc_ratio": -0.971,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "classified_at": "2026-03-07 05:10:39",
+    "optimal_cooldown": 999
+  },
+  "BAJAJ-AUTO": {
+    "symbol": "BAJAJ-AUTO",
+    "tier": 3,
+    "gc_ratio": 0.197,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "classified_at": "2026-03-07 05:10:39",
+    "optimal_cooldown": 999
+  },
+  "BOSCHLTD": {
+    "symbol": "BOSCHLTD",
+    "tier": 2,
+    "gc_ratio": 1.561,
+    "label": "Tier 2 \u2014 Moderate",
+    "classified_at": "2026-03-07 05:10:39",
+    "optimal_cooldown": 50
+  },
+  "ALKEM": {
+    "symbol": "ALKEM",
+    "tier": 3,
+    "gc_ratio": -1.649,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "classified_at": "2026-03-07 05:10:39",
+    "optimal_cooldown": 999
+  },
+  "APOLLOHOSP": {
+    "symbol": "APOLLOHOSP",
+    "tier": 3,
+    "gc_ratio": -0.437,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "ASIANPAINT": {
+    "symbol": "ASIANPAINT",
+    "tier": 3,
+    "gc_ratio": 0.264,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "AUROPHARMA": {
+    "symbol": "AUROPHARMA",
+    "tier": 3,
+    "gc_ratio": 0.331,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "CIPLA": {
+    "symbol": "CIPLA",
+    "tier": 3,
+    "gc_ratio": -0.984,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "DIVISLAB": {
+    "symbol": "DIVISLAB",
+    "tier": 3,
+    "gc_ratio": 0.081,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "HCLTECH": {
+    "symbol": "HCLTECH",
+    "tier": 2,
+    "gc_ratio": 2.446,
+    "label": "Tier 2 \u2014 Moderate",
+    "optimal_cooldown": 50,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "INFY": {
+    "symbol": "INFY",
+    "tier": 3,
+    "gc_ratio": -0.143,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "LT": {
+    "symbol": "LT",
+    "tier": 3,
+    "gc_ratio": 0.845,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "MARUTI": {
+    "symbol": "MARUTI",
+    "tier": 3,
+    "gc_ratio": 1.077,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "MAXHEALTH": {
+    "symbol": "MAXHEALTH",
+    "tier": 3,
+    "gc_ratio": -0.411,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "MPHASIS": {
+    "symbol": "MPHASIS",
+    "tier": 2,
+    "gc_ratio": 1.193,
+    "label": "Tier 2 \u2014 Moderate",
+    "optimal_cooldown": 50,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "OFSS": {
+    "symbol": "OFSS",
+    "tier": 2,
+    "gc_ratio": 1.733,
+    "label": "Tier 2 \u2014 Moderate",
+    "optimal_cooldown": 50,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "PERSISTENT": {
+    "symbol": "PERSISTENT",
+    "tier": 2,
+    "gc_ratio": 1.801,
+    "label": "Tier 2 \u2014 Moderate",
+    "optimal_cooldown": 50,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "PIDILITIND": {
+    "symbol": "PIDILITIND",
+    "tier": 3,
+    "gc_ratio": -2.52,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "RELIANCE": {
+    "symbol": "RELIANCE",
+    "tier": 2,
+    "gc_ratio": 1.591,
+    "label": "Tier 2 \u2014 Moderate",
+    "optimal_cooldown": 50,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "SUNPHARMA": {
+    "symbol": "SUNPHARMA",
+    "tier": 3,
+    "gc_ratio": -0.756,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "TCS": {
+    "symbol": "TCS",
+    "tier": 3,
+    "gc_ratio": 0.843,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "TITAN": {
+    "symbol": "TITAN",
+    "tier": 3,
+    "gc_ratio": -0.213,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "TVSMOTOR": {
+    "symbol": "TVSMOTOR",
+    "tier": 3,
+    "gc_ratio": 0.894,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "VEDL": {
+    "symbol": "VEDL",
+    "tier": 3,
+    "gc_ratio": 1.023,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  },
+  "WIPRO": {
+    "symbol": "WIPRO",
+    "tier": 3,
+    "gc_ratio": 0.243,
+    "label": "Tier 3 \u2014 Skipped (choppy)",
+    "optimal_cooldown": 999,
+    "classified_at": "2026-03-07 05:10:39"
+  }
+}

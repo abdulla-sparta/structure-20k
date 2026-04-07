@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StructureEngine — Heatmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#e53e3e;--red2:#c53030;--red-grad:linear-gradient(135deg,#c53030 0%,#e53e3e 50%,#fc8181 100%);
+  --green:#16a34a;--green-light:#dcfce7;--red-light:#fee2e2;
+  --amber:#d97706;--blue:#2563eb;
+  --bg:#f0f2f5;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
+  --up:#16a34a;--dn:#dc2626;--flat:#64748b;
+}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-x:hidden}
+
+/* ── HEADER ── */
+.header{
+  height:52px;background:var(--red-grad);display:flex;align-items:center;
+  padding:0 18px;gap:14px;box-shadow:0 2px 12px rgba(197,48,48,.3);position:sticky;top:0;z-index:100
+}
+.hdr-logo{display:flex;align-items:center;gap:9px}
+.hdr-mark{width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;
+  border:1px solid rgba(255,255,255,.3)}
+.hdr-name{font-size:14px;font-weight:700;color:#fff}
+.hdr-badge{background:rgba(255,255,255,.2);color:#fff;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:4px;letter-spacing:.8px;border:1px solid rgba(255,255,255,.3)}
+.hdr-sep{width:1px;height:22px;background:rgba(255,255,255,.25)}
+.hdr-nav{display:flex;gap:4px}
+.hdr-tab{padding:6px 14px;border-radius:7px;color:rgba(255,255,255,.75);font-size:13px;
+  font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none;display:flex;align-items:center;gap:6px}
+.hdr-tab:hover{background:rgba(255,255,255,.15);color:#fff}
+.hdr-tab.active{background:rgba(255,255,255,.22);color:#fff;font-weight:600}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.hdr-time{font-size:11px;font-weight:600;color:rgba(255,255,255,.8);font-family:'JetBrains Mono',monospace}
+.hdr-refresh{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;
+  padding:5px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;
+  font-family:'Inter',sans-serif;transition:opacity .15s}
+.hdr-refresh:hover{opacity:.85}
+.hdr-interval{display:flex;gap:4px}
+.hdr-int{padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:transparent;
+  color:rgba(255,255,255,.75);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+.hdr-int.active,.hdr-int:hover{background:rgba(255,255,255,.22);color:#fff}
+
+/* ── TOOLBAR ── */
+.toolbar{
+  padding:10px 18px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap
+}
+.tb-stat{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:8px;
+  background:var(--bg);border:1px solid var(--border)}
+.tb-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.tb-val{font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.up{color:var(--up)}.dn{color:var(--dn)}.flat{color:var(--flat)}
+.tb-sort{margin-left:auto;display:flex;gap:6px;align-items:center}
+.sort-label{font-size:11px;color:var(--muted);font-weight:500}
+.sort-btn{padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);
+  font-size:11px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;color:var(--text)}
+.sort-btn.active,.sort-btn:hover{border-color:var(--red);color:var(--red);background:#fff5f5}
+
+/* ── HEATMAP GRID ── */
+.heatmap{
+  padding:16px 18px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:8px;
+}
+
+/* ── CELL ── */
+.cell{
+  border-radius:12px;padding:14px;cursor:pointer;position:relative;overflow:hidden;
+  transition:transform .15s,box-shadow .15s;border:1px solid transparent;
+  min-height:100px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.cell:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:2}
+.cell::before{
+  content:'';position:absolute;inset:0;opacity:.08;border-radius:12px;
+  background:currentColor;pointer-events:none;
+}
+
+/* Color tiers based on % change */
+.cell.big-up   {background:linear-gradient(135deg,#14532d,#16a34a);color:#fff;border-color:#15803d}
+.cell.mid-up   {background:linear-gradient(135deg,#166534,#22c55e);color:#fff;border-color:#16a34a}
+.cell.small-up {background:linear-gradient(135deg,#bbf7d0,#dcfce7);color:#166534;border-color:#86efac}
+.cell.flat     {background:linear-gradient(135deg,#f1f5f9,#e2e8f0);color:#475569;border-color:#cbd5e1}
+.cell.small-dn {background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;border-color:#fca5a5}
+.cell.mid-dn   {background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;border-color:#b91c1c}
+.cell.big-dn   {background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;border-color:#991b1b}
+.cell.loading  {background:var(--bg);color:var(--muted);border-color:var(--border);animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+
+.cell-sym{font-size:13px;font-weight:800;letter-spacing:.3px;margin-bottom:4px}
+.cell-name{font-size:10px;font-weight:500;opacity:.75;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell-ltp{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.cell-pct{font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-bottom:2px}
+.cell-chg{font-size:11px;font-weight:500;opacity:.8;font-family:'JetBrains Mono',monospace}
+.cell-arrow{position:absolute;top:10px;right:12px;font-size:18px;opacity:.6}
+.cell-tag{
+  position:absolute;bottom:8px;right:8px;font-size:9px;font-weight:700;
+  padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.15);letter-spacing:.5px
+}
+
+/* ── FLASH animation on LTP update ── */
+@keyframes flash-up{0%{box-shadow:0 0 0 3px rgba(22,163,74,.8)}100%{box-shadow:none}}
+@keyframes flash-dn{0%{box-shadow:0 0 0 3px rgba(220,38,38,.8)}100%{box-shadow:none}}
+.flash-up{animation:flash-up .5s ease-out}
+.flash-dn{animation:flash-dn .5s ease-out}
+
+/* ── LEGEND ── */
+.legend{
+  padding:8px 18px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap
+}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--muted)}
+.leg-dot{width:10px;height:10px;border-radius:3px}
+
+/* ── DETAIL PANEL (click cell) ── */
+.detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:500;
+  display:none;align-items:center;justify-content:flex-end}
+.detail-overlay.open{display:flex}
+.detail-panel{
+  width:320px;height:100%;background:var(--surface);
+  box-shadow:-8px 0 40px rgba(0,0,0,.15);
+  display:flex;flex-direction:column;animation:slideRight .2s ease
+}
+@keyframes slideRight{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+.dp-head{padding:18px;background:var(--red-grad);flex-shrink:0}
+.dp-sym{font-size:22px;font-weight:800;color:#fff}
+.dp-ltp{font-size:28px;font-weight:700;color:#fff;font-family:'JetBrains Mono',monospace;margin:4px 0}
+.dp-chg{font-size:14px;font-weight:600;color:rgba(255,255,255,.85)}
+.dp-close{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.2);
+  border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px}
+.dp-body{flex:1;overflow-y:auto;padding:16px}
+.dp-section{margin-bottom:16px}
+.dp-sec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+  color:var(--muted);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.dp-row{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 0;border-bottom:1px solid var(--border)}
+.dp-row:last-child{border-bottom:none}
+.dp-key{font-size:12px;color:var(--muted);font-weight:500}
+.dp-value{font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.dp-actions{padding:16px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.dp-btn{padding:10px;border-radius:8px;border:none;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:'Inter',sans-serif;transition:opacity .15s}
+.dp-btn-p{background:var(--red-grad);color:#fff}
+.dp-btn-s{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.dp-btn:hover{opacity:.85}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="hdr-logo">
+    <div class="hdr-mark">SE</div>
+    <span class="hdr-name">STRUCTUREENGINE</span>
+    <span class="hdr-badge">HEATMAP</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <nav class="hdr-nav">
+    <a href="/"      class="hdr-tab">📈 Backtest</a>
+    <a href="/live"  class="hdr-tab">⚡ Live</a>
+    <a href="/heatmap" class="hdr-tab active">🔥 Heatmap</a>
+    <a href="/signals" class="hdr-tab">📡 Signals</a>
+  </nav>
+  <div class="hdr-right">
+    <div class="hdr-interval">
+      <div class="hdr-int active" onclick="setSort('pct')">Sort % Change</div>
+      <div class="hdr-int" onclick="setSort('sym')">Sort A–Z</div>
+      <div class="hdr-int" onclick="setSort('abs')">Sort ₹ Chg</div>
+    </div>
+    <span id="connDot" style="font-size:11px;font-weight:700;padding:4px 10px;
+      border-radius:6px;background:rgba(255,255,255,.15);color:rgba(255,255,255,.8)">
+      🟡 Connecting…
+    </span>
+    <span class="hdr-time" id="clock">—</span>
+    <button class="hdr-refresh" onclick="fetchQuotes()">⟳ Refresh</button>
+  </div>
+</header>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="tb-stat"><span class="tb-label">Advancing</span><span class="tb-val up" id="tbUp">—</span></div>
+  <div class="tb-stat"><span class="tb-label">Declining</span><span class="tb-val dn" id="tbDn">—</span></div>
+  <div class="tb-stat"><span class="tb-label">Unchanged</span><span class="tb-val flat" id="tbFlat">—</span></div>
+  <div class="tb-stat"><span class="tb-label">Avg Change</span><span class="tb-val" id="tbAvg">—</span></div>
+  <div class="tb-stat"><span class="tb-label">Best</span><span class="tb-val up" id="tbBest">—</span></div>
+  <div class="tb-stat"><span class="tb-label">Worst</span><span class="tb-val dn" id="tbWorst">—</span></div>
+  <div class="tb-stat"><span class="tb-label">Last update</span><span class="tb-val flat" id="tbTime">—</span></div>
+</div>
+
+<!-- HEATMAP GRID -->
+<div class="heatmap" id="heatmap">
+  {% for inst in instruments %}
+  <div class="cell loading" id="cell-{{inst.symbol}}" onclick="openDetail('{{inst.symbol}}')">
+    <div>
+      <div class="cell-sym">{{inst.symbol}}</div>
+      <div class="cell-name">—</div>
+    </div>
+    <div>
+      <div class="cell-ltp">—</div>
+      <div class="cell-pct">—</div>
+      <div class="cell-chg">—</div>
+    </div>
+    <span class="cell-arrow">·</span>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:#14532d"></div> >+2%</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div> +1–2%</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#bbf7d0"></div> 0–1%</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#e2e8f0"></div> Flat</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fecaca"></div> 0–1%↓</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ef4444"></div> 1–2%↓</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#7f1d1d"></div> >2%↓</div>
+  <span style="margin-left:auto;font-size:10px;color:var(--muted)">Live WS ticks every 0.5s · REST fallback when offline · click cell for details</span>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail(event)">
+  <div class="detail-panel" onclick="event.stopPropagation()" style="position:relative">
+    <div class="dp-head">
+      <button class="dp-close" onclick="closeDetailBtn()">✕</button>
+      <div class="dp-sym" id="dpSym">—</div>
+      <div class="dp-ltp" id="dpLtp">—</div>
+      <div class="dp-chg" id="dpChg">—</div>
+    </div>
+    <div class="dp-body">
+      <div class="dp-section">
+        <div class="dp-sec-title">Price</div>
+        <div class="dp-row"><span class="dp-key">LTP</span><span class="dp-value" id="dpLtp2">—</span></div>
+        <div class="dp-row"><span class="dp-key">Prev Close</span><span class="dp-value" id="dpPC">—</span></div>
+        <div class="dp-row"><span class="dp-key">Change ₹</span><span class="dp-value" id="dpChgR">—</span></div>
+        <div class="dp-row"><span class="dp-key">Change %</span><span class="dp-value" id="dpChgP">—</span></div>
+      </div>
+      <div class="dp-section">
+        <div class="dp-sec-title">Backtest Performance</div>
+        <div class="dp-row"><span class="dp-key">Return %</span><span class="dp-value" id="dpBtRet">—</span></div>
+        <div class="dp-row"><span class="dp-key">Net PnL</span><span class="dp-value" id="dpBtPnl">—</span></div>
+        <div class="dp-row"><span class="dp-key">Trades</span><span class="dp-value" id="dpBtTrd">—</span></div>
+        <div class="dp-row"><span class="dp-key">Win Rate</span><span class="dp-value" id="dpBtWR">—</span></div>
+      </div>
+    </div>
+    <div class="dp-actions">
+      <button class="dp-btn dp-btn-p" onclick="goToBacktest()">📈 View in Backtest</button>
+      <button class="dp-btn dp-btn-s" onclick="goToLive()">⚡ View in Live</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════════════ */
+let quotes    = {};    // symbol → {ltp, prev_close, change, change_pct}
+const round = (v, d) => Math.round(v * 10**d) / 10**d;
+let btResults = {};    // symbol → backtest row (from localStorage if available)
+let sortMode  = 'pct';
+let activeSym = '';
+const SYMS    = [...document.querySelectorAll('[id^="cell-"]')].map(el=>el.id.replace('cell-',''));
+
+/* ════════════════════════════════════════════════════════════
+   CLOCK
+════════════════════════════════════════════════════════════ */
+function tick(){
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(tick,1000); tick();
+
+
+
+function setConnDot(ok){
+  const el = document.getElementById('connDot');
+  if(!el) return;
+  if(ok){
+    el.textContent = '🟢 Live';
+    el.style.color = '#16a34a';
+  } else if(isMarketHours()){
+    el.textContent = '🔴 Offline';
+    el.style.color = '#dc2626';
+  } else {
+    el.textContent = '💤 Market Closed — REST snapshot';
+    el.style.color = '#d97706';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   FETCH QUOTES — REST fallback (used on load + manual refresh)
+════════════════════════════════════════════════════════════ */
+function fetchQuotes(){
+  document.getElementById('tbTime').textContent = 'Fetching…';
+  fetch('/quotes').then(r=>r.json()).then(data=>{
+    const prev = {...quotes};
+    // Normalize: ensure change_pct is numeric for every symbol
+    Object.keys(data).forEach(sym => {
+      const q = data[sym];
+      if(!q) return;
+      if((q.change_pct == null || isNaN(q.change_pct)) && q.prev_close && q.ltp){
+        q.change     = Math.round((q.ltp - q.prev_close)*100)/100;
+        q.change_pct = Math.round((q.change / q.prev_close)*10000)/100;
+      }
+      if(q.change_pct == null || isNaN(q.change_pct)) q.change_pct = 0;
+      if(q.change == null || isNaN(q.change))          q.change = 0;
+    });
+    quotes = data;
+    renderAll(prev);
+    updateToolbar();
+    const ts = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('tbTime').textContent = ts;
+    // Update status based on data source
+    const anyLtp = Object.values(data).some(q=>q&&q.ltp);
+    if(anyLtp && !wsConnected) setConnDot(false);
+  }).catch(e=>{
+    document.getElementById('tbTime').textContent = 'Error: '+e.message;
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   RENDER
+════════════════════════════════════════════════════════════ */
+function colorClass(pct){
+  if(pct == null || isNaN(pct)) return 'flat';
+  if(pct >= 2)   return 'big-up';
+  if(pct >= 1)   return 'mid-up';
+  if(pct > 0)    return 'small-up';
+  if(pct === 0)  return 'flat';
+  if(pct > -1)   return 'small-dn';
+  if(pct > -2)   return 'mid-dn';
+  return 'big-dn';
+}
+
+function arrow(pct){
+  if(pct == null) return '·';
+  if(pct > 0.5)  return '▲';
+  if(pct < -0.5) return '▼';
+  return '—';
+}
+
+function renderCell(sym, q, prev){
+  const el = document.getElementById('cell-'+sym);
+  if(!el) return;
+
+  if(!q || q.ltp == null){
+    el.className = 'cell loading';
+    el.querySelector('.cell-ltp').textContent = '—';
+    el.querySelector('.cell-pct').textContent = '—';
+    el.querySelector('.cell-chg').textContent = '—';
+    return;
+  }
+  // Compute change_pct if missing (first tick before prev_close arrives)
+  if((q.change_pct == null || isNaN(q.change_pct)) && q.prev_close){
+    q.change     = round(q.ltp - q.prev_close, 2);
+    q.change_pct = round((q.change / q.prev_close) * 100, 2);
+  }
+  if(q.change_pct == null || isNaN(q.change_pct)) q.change_pct = 0;
+  if(q.change     == null || isNaN(q.change))     q.change     = 0;
+
+  const pct  = q.change_pct;
+  const cc   = colorClass(pct);
+  const sign = pct >= 0 ? '+' : '';
+  const prevQ = prev?.[sym];
+
+  el.className = 'cell '+cc;
+  el.querySelector('.cell-ltp').textContent = '₹'+Number(q.ltp).toFixed(2);
+  el.querySelector('.cell-pct').textContent = sign+Number(pct).toFixed(2)+'%';
+  el.querySelector('.cell-chg').textContent = (q.change>=0?'+':'')+Number(q.change).toFixed(2)+' ₹';
+  el.querySelector('.cell-arrow').textContent = arrow(pct);
+
+  // Flash on change
+  if(prevQ && prevQ.ltp !== q.ltp){
+    const fc = q.ltp > prevQ.ltp ? 'flash-up' : 'flash-dn';
+    el.classList.add(fc);
+    setTimeout(()=>el.classList.remove(fc),600);
+  }
+
+  // Resize LTP font based on magnitude
+  const ltpEl = el.querySelector('.cell-ltp');
+  const ltp   = q.ltp;
+  ltpEl.style.fontSize = ltp >= 10000 ? '13px' : ltp >= 1000 ? '16px' : '18px';
+}
+
+function renderAll(prev={}){
+  let syms = [...SYMS];
+
+  if(sortMode === 'pct')
+    syms.sort((a,b)=>{
+      const pa = quotes[a]?.change_pct ?? -999;
+      const pb = quotes[b]?.change_pct ?? -999;
+      return pb - pa;
+    });
+  else if(sortMode === 'sym')
+    syms.sort();
+  else if(sortMode === 'abs')
+    syms.sort((a,b)=>{
+      const pa = Math.abs(quotes[a]?.change ?? 0);
+      const pb = Math.abs(quotes[b]?.change ?? 0);
+      return pb - pa;
+    });
+
+  const grid = document.getElementById('heatmap');
+  syms.forEach(sym => {
+    const el = document.getElementById('cell-'+sym);
+    if(el) grid.appendChild(el);   // re-order by appending
+    renderCell(sym, quotes[sym], prev);
+  });
+}
+
+function updateToolbar(){
+  const vals = Object.values(quotes).filter(q=>q.ltp!=null);
+  const up   = vals.filter(q=>q.change_pct > 0.05).length;
+  const dn   = vals.filter(q=>q.change_pct < -0.05).length;
+  const flat = vals.length - up - dn;
+  const avg  = vals.length ? vals.reduce((s,q)=>s+(q.change_pct||0),0)/vals.length : 0;
+  const best = vals.reduce((b,q)=>q.change_pct>b.change_pct?q:b, {change_pct:-999,ltp:0});
+  const worst= vals.reduce((w,q)=>q.change_pct<w.change_pct?q:w, {change_pct:999,ltp:0});
+
+  const bestSym  = Object.entries(quotes).find(([,q])=>q===best)?.[0] || '—';
+  const worstSym = Object.entries(quotes).find(([,q])=>q===worst)?.[0] || '—';
+
+  document.getElementById('tbUp').textContent   = up;
+  document.getElementById('tbDn').textContent   = dn;
+  document.getElementById('tbFlat').textContent = flat;
+  const avgEl = document.getElementById('tbAvg');
+  avgEl.textContent  = (avg>=0?'+':'')+avg.toFixed(2)+'%';
+  avgEl.className    = 'tb-val '+(avg>=0?'up':'dn');
+  document.getElementById('tbBest').textContent  = bestSym+' '+( best.change_pct>-900?('+'+best.change_pct.toFixed(2)+'%'):'—');
+  document.getElementById('tbWorst').textContent = worstSym+' '+(worst.change_pct<900?(worst.change_pct.toFixed(2)+'%'):'—');
+}
+
+function setSort(mode){
+  sortMode = mode;
+  document.querySelectorAll('.hdr-int').forEach(el=>el.classList.remove('active'));
+  event.target.classList.add('active');
+  renderAll();
+}
+
+/* ════════════════════════════════════════════════════════════
+   DETAIL PANEL
+════════════════════════════════════════════════════════════ */
+function openDetail(sym){
+  activeSym = sym;
+  const q   = quotes[sym] || {};
+  const pct = q.change_pct ?? 0;
+  const sign= pct >= 0 ? '+' : '';
+
+  document.getElementById('dpSym').textContent  = sym;
+  document.getElementById('dpLtp').textContent  = q.ltp ? '₹'+Number(q.ltp).toFixed(2) : '—';
+  document.getElementById('dpLtp2').textContent = q.ltp ? '₹'+Number(q.ltp).toFixed(2) : '—';
+  document.getElementById('dpChg').textContent  = q.ltp ? sign+pct.toFixed(2)+'%  ('+( q.change>=0?'+':'')+Number(q.change).toFixed(2)+' ₹)' : '—';
+  document.getElementById('dpPC').textContent   = q.prev_close ? '₹'+Number(q.prev_close).toFixed(2) : '—';
+  document.getElementById('dpChgR').textContent = q.change != null ? (q.change>=0?'+':'')+Number(q.change).toFixed(2) : '—';
+  document.getElementById('dpChgP').textContent = pct != null ? sign+pct.toFixed(2)+'%' : '—';
+
+  // Backtest data (from localStorage if backtest was run)
+  const bt = btResults[sym];
+  document.getElementById('dpBtRet').textContent = bt ? (bt.return_pct>=0?'+':'')+bt.return_pct+'%' : 'Run backtest';
+  document.getElementById('dpBtPnl').textContent = bt ? '₹'+Math.round(bt.net_pnl) : '—';
+  document.getElementById('dpBtTrd').textContent = bt ? bt.trades : '—';
+  document.getElementById('dpBtWR').textContent  = bt ? bt.win_rate+'%' : '—';
+
+  document.getElementById('detailOverlay').classList.add('open');
+}
+
+function closeDetail(e){
+  if(e.target===document.getElementById('detailOverlay')) closeDetailBtn();
+}
+function closeDetailBtn(){
+  document.getElementById('detailOverlay').classList.remove('open');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetailBtn();});
+
+function goToBacktest(){ window.location.href='/'; }
+function goToLive()    { window.location.href='/live'; }
+
+/* ════════════════════════════════════════════════════════════
+   SOCKET.IO — single connection, listens to live_update + heatmap_tick
+════════════════════════════════════════════════════════════ */
+const socket = typeof io !== 'undefined' ? io() : null;
+let wsConnected = false;
+
+if(socket){
+  socket.on('connect', ()=>{
+    wsConnected = true;
+    setConnDot(true);
+    fetchQuotes();
+  });
+  socket.on('disconnect', ()=>{ wsConnected = false; setConnDot(false); });
+
+  // From live engine push_loop (every 1s when engine running)
+  socket.on('live_update', data => {
+    if(!data.instruments) return;
+    lastTickTime = Date.now(); // live engine is running — pause REST poll
+    const prev = {...quotes};
+    data.instruments.forEach(inst => {
+      if(!inst.symbol || inst.ltp == null) return;
+      const sym = inst.symbol;
+      const existingPc = quotes[sym]?.prev_close;
+      // Use REST-fetched prev_close if available and valid, else use inst.prev_close
+      const pc = (existingPc && existingPc !== existingPc?.ltp) ? existingPc : (inst.prev_close || existingPc || inst.ltp);
+      quotes[sym] = {
+        ltp:        inst.ltp,
+        prev_close: pc,
+        change:     pc ? Math.round((inst.ltp - pc) * 100) / 100 : (inst.change ?? 0),
+        change_pct: pc ? Math.round(((inst.ltp - pc) / pc) * 10000) / 100 : (inst.change_pct ?? 0),
+      };
+      renderCell(sym, quotes[sym], {[sym]: prev[sym]});
+    });
+    const ts = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('tbTime').textContent = ts;
+    updateToolbar();
+    if(sortMode === 'pct') renderAll(prev);
+  });
+
+  // heatmap_tick ignored — REST fetchQuotes is authoritative for prev_close
+  // socket.on('heatmap_tick', ...) removed to prevent stale CSV prev_close overwriting correct REST data
+
+  // Per-tick from live engine (when running) — same source as live.html, perfectly in sync
+  socket.on('tick_update', tick => {
+    if(!tick.symbol || tick.ltp == null) return;
+    lastTickTime = Date.now(); // mark that live ticks are flowing — REST poll will pause
+    const sym  = tick.symbol;
+    const prev = quotes[sym] ? {...quotes} : {};
+    // Only update LTP — keep existing prev_close from REST (it's correct)
+    const existingPc = quotes[sym]?.prev_close;
+    const pc = (existingPc && existingPc !== quotes[sym]?.ltp) ? existingPc : (tick.prev_close || existingPc || tick.ltp);
+    quotes[sym] = {
+      ltp:        tick.ltp,
+      prev_close: pc,
+      change:     pc ? Math.round((tick.ltp - pc) * 100) / 100 : (tick.change ?? 0),
+      change_pct: pc ? Math.round(((tick.ltp - pc) / pc) * 10000) / 100 : (tick.change_pct ?? 0),
+      volume:     tick.volume || quotes[sym]?.volume,
+      atp:        tick.atp    || quotes[sym]?.atp,
+    };
+    renderCell(sym, quotes[sym], prev);
+    const ts = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('tbTime').textContent = ts;
+    updateToolbar();
+    if(sortMode === 'pct') renderAll(prev);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════
+   AUTO-REFRESH fallback every 30s ONLY if WS is disconnected
+════════════════════════════════════════════════════════════ */
+function isMarketHours(){
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  const h = ist.getHours(), m = ist.getMinutes();
+  const mins = h*60+m;
+  const day  = ist.getDay();
+  return day>=1 && day<=5 && mins>=555 && mins<=935;
+}
+
+// REST poll — only runs when NOT receiving live WS ticks
+// Once tick_update starts flowing, REST is paused to avoid fighting WS data
+let lastTickTime = 0;
+let restPollInterval = null;
+
+function startRestPoll() {
+  if (restPollInterval) return;
+  restPollInterval = setInterval(() => {
+    const tickAge = Date.now() - lastTickTime;
+    if (tickAge < 3000) return; // WS ticks flowing in last 3s — skip REST
+    fetchQuotes();
+  }, 2000);
+}
+startRestPoll();
+
+/* ════════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════════ */
+fetchQuotes();
+setConnDot(false);
+</script>
+</body>
+</html>

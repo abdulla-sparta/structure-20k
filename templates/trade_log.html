@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trade Log — StructureEngine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#e53e3e;--red2:#c53030;--red-grad:linear-gradient(135deg,#c53030 0%,#e53e3e 50%,#fc8181 100%);
+  --bg:#f7f8fa;--surface:#fff;--border:#e8eaed;--text:#1a1d23;--muted:#6b7280;
+  --green:#16a34a;--amber:#d97706;
+}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+
+/* HEADER */
+.header{height:52px;background:var(--red-grad);display:flex;align-items:center;
+  padding:0 18px;gap:14px;box-shadow:0 2px 12px rgba(197,48,48,.35);position:sticky;top:0;z-index:100}
+.hdr-logo{display:flex;align-items:center;gap:8px}
+.hdr-mark{width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;
+  border:1px solid rgba(255,255,255,.3)}
+.hdr-name{font-size:14px;font-weight:700;color:#fff}
+.hdr-badge{background:rgba(255,255,255,.2);color:#fff;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:4px;letter-spacing:.7px;border:1px solid rgba(255,255,255,.3)}
+.hdr-sep{width:1px;height:22px;background:rgba(255,255,255,.3)}
+.hdr-tab{padding:6px 14px;border-radius:7px;color:rgba(255,255,255,.75);font-size:13px;
+  font-weight:500;cursor:pointer}
+.hdr-tab:hover,.hdr-tab.active{background:rgba(255,255,255,.22);color:#fff;font-weight:600}
+.hdr-right{margin-left:auto}
+.btn-back{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+  color:#fff;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+
+/* LAYOUT */
+.body{display:flex;height:calc(100vh - 52px);overflow:hidden}
+
+/* LEFT PANEL — symbol list */
+.lpanel{width:200px;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.lp-head{padding:12px 14px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#fff5f5,#fff);flex-shrink:0}
+.lp-title{font-size:10px;font-weight:700;color:var(--red2);letter-spacing:.8px;
+  text-transform:uppercase;margin-bottom:8px}
+.search-inp{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:7px;
+  font-size:12px;font-family:'Inter',sans-serif;background:var(--bg)}
+.search-inp:focus{outline:none;border-color:var(--red)}
+.sym-list{flex:1;overflow-y:auto;padding:6px 8px}
+.sym-list::-webkit-scrollbar{width:3px}
+.sym-list::-webkit-scrollbar-thumb{background:var(--border)}
+.sym-btn{width:100%;text-align:left;padding:7px 10px;border-radius:7px;border:none;
+  background:transparent;cursor:pointer;font-family:'JetBrains Mono',monospace;
+  font-size:12px;font-weight:500;color:var(--text);display:flex;align-items:center;
+  justify-content:space-between;margin-bottom:2px;transition:all .15s}
+.sym-btn:hover{background:var(--bg)}
+.sym-btn.active{background:#fff5f5;color:var(--red2);font-weight:700;border-left:3px solid var(--red)}
+.sym-count{font-size:10px;color:var(--muted);font-family:'Inter',sans-serif}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* FILTER BAR */
+.filter-bar{padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.filter-bar h2{font-size:15px;font-weight:700;margin-right:4px}
+.date-select{padding:6px 10px;border:1px solid var(--border);border-radius:7px;
+  font-size:12px;font-family:'Inter',sans-serif;background:var(--bg);min-width:220px}
+.date-select:focus{outline:none;border-color:var(--red)}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.tag-bt{background:#fee2e2;color:var(--red2)}
+.tag-live{background:#dcfce7;color:var(--green)}
+.refresh-btn{padding:6px 12px;border-radius:7px;border:1px solid var(--border);
+  background:var(--bg);font-size:11px;font-weight:600;cursor:pointer;
+  font-family:'Inter',sans-serif;margin-left:auto}
+.refresh-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* SUMMARY CARDS */
+.summary{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface);
+  border-bottom:1px solid var(--border);flex-shrink:0}
+.sc{padding:10px 14px;border-right:1px solid var(--border);text-align:center}
+.sc:last-child{border-right:none}
+.sc-l{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:3px}
+.sc-v{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+
+/* TABLE */
+.tbl-wrap{flex:1;overflow-y:auto}
+.tbl-wrap::-webkit-scrollbar{width:5px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+table.tlog{width:100%;border-collapse:collapse;font-size:12px}
+.tlog thead th{position:sticky;top:0;z-index:5;
+  background:linear-gradient(180deg,#fff5f5,#fff);
+  padding:9px 14px;text-align:left;font-size:10px;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;color:var(--muted);
+  border-bottom:2px solid #fca5a5;cursor:pointer;user-select:none;white-space:nowrap}
+.tlog thead th:hover{color:var(--red2)}
+.tlog thead th.sorted{color:var(--red2)}
+.tlog tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+.tlog tbody tr:hover{background:#fff5f5}
+.tlog td{padding:9px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap}
+.tlog td.dir-buy{color:#2563eb;font-weight:700}
+.tlog td.dir-sell{color:var(--red);font-weight:700}
+.tlog td.pos{color:var(--green);font-weight:600}
+.tlog td.neg{color:var(--red);font-weight:600}
+.tlog td.muted{color:var(--muted)}
+.reason-badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;
+  font-weight:600;font-family:'Inter',sans-serif}
+.rb-sl{background:#fee2e2;color:var(--red2)}
+.rb-tp{background:#dcfce7;color:var(--green)}
+.rb-eod{background:#fef3c7;color:var(--amber)}
+.rb-kill{background:#f3e8ff;color:#7c3aed}
+
+/* EMPTY / LOADING */
+.empty{padding:60px 20px;text-align:center;color:var(--muted)}
+.empty .ei{font-size:40px;margin-bottom:12px;opacity:.3}
+.empty .et{font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px}
+.empty .es{font-size:12px;line-height:1.6}
+.loader{display:flex;align-items:center;justify-content:center;padding:40px;gap:8px;color:var(--muted);font-size:12px}
+.spin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--red);
+  border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1d23;color:#fff;
+  padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;
+  opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:999}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="hdr-logo">
+    <div class="hdr-mark">SE</div>
+    <span class="hdr-name">STRUCTUREENGINE</span>
+    <span class="hdr-badge">TRADE LOG</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-tab" onclick="location.href='/'">📈 Backtest</div>
+  <div class="hdr-tab" onclick="location.href='/live'">⚡ Live</div>
+  <div class="hdr-tab active">📋 Trade Log</div>
+  <div class="hdr-right">
+    <button class="btn-back" onclick="location.href='/'">← Back</button>
+  </div>
+</header>
+
+<div class="body">
+
+<!-- LEFT: Symbol list -->
+<aside class="lpanel">
+  <div class="lp-head">
+    <div class="lp-title">Symbols</div>
+    <input class="search-inp" type="text" id="symSearch" placeholder="Filter…" oninput="filterSyms()">
+  </div>
+  <div class="sym-list" id="symList">
+    <!-- filled by JS -->
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <h2 id="mainTitle">Select a symbol</h2>
+    <!-- Source toggle -->
+    <div style="display:flex;gap:4px;margin-left:8px">
+      <button id="srcBt"   onclick="setSource('backtest')"
+        style="padding:5px 12px;border-radius:7px;border:1px solid var(--border);
+               font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
+               background:#fee2e2;color:var(--red2)">
+        🔬 Backtest
+      </button>
+      <button id="srcLive" onclick="setSource('live')"
+        style="padding:5px 12px;border-radius:7px;border:1px solid var(--border);
+               font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
+               background:var(--bg);color:var(--muted)">
+        ⚡ Live
+      </button>
+    </div>
+    <!-- Live date picker (hidden for backtest) -->
+    <input type="date" id="liveDate"
+      style="display:none;padding:5px 10px;border:1px solid var(--border);
+             border-radius:7px;font-size:12px;font-family:inherit"
+      oninput="loadTrades()">
+    <span id="btRunLabel"
+      style="font-size:11px;color:var(--muted);font-style:italic"></span>
+    <span class="tag" id="dateTag"></span>
+    <button class="refresh-btn" onclick="loadTrades()">🔄 Refresh</button>
+    <button class="refresh-btn" onclick="exportCSV()" id="btnExport" style="display:none">⬇ Export CSV</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="summary">
+    <div class="sc"><div class="sc-l">Total Trades</div><div class="sc-v neu" id="sTrades">—</div></div>
+    <div class="sc"><div class="sc-l">Wins</div><div class="sc-v pos" id="sWins">—</div></div>
+    <div class="sc"><div class="sc-l">Losses</div><div class="sc-v neg" id="sLoss">—</div></div>
+    <div class="sc"><div class="sc-l">Win Rate</div><div class="sc-v neu" id="sWR">—</div></div>
+    <div class="sc"><div class="sc-l">Gross PnL</div><div class="sc-v neu" id="sGross">—</div></div>
+    <div class="sc"><div class="sc-l">Charges</div><div class="sc-v neg" id="sChg">—</div></div>
+    <div class="sc"><div class="sc-l">Net PnL</div><div class="sc-v neu" id="sNet">—</div></div>
+  </div>
+
+  <!-- Table -->
+  <div class="tbl-wrap">
+    <div id="tblContainer">
+      <div class="empty">
+        <div class="ei">📋</div>
+        <div class="et">No symbol selected</div>
+        <div class="es">Pick a symbol from the left panel to view its trade log</div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── State ─────────────────────────────────────────────────────── */
+const INSTRUMENTS = {{ instruments | tojson }};
+let activeSym  = null;
+let activeDate = "all";
+let allTrades  = [];
+let sortKey    = "entry_time";
+let sortAsc    = true;
+
+/* ── Helpers ───────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const fmtP = v => v == null ? "—" : (v >= 0 ? "+" : "") + "₹" + Math.round(v).toLocaleString();
+const cls  = v => v == null ? "neu" : v >= 0 ? "pos" : "neg";
+
+function toast(msg, dur=3000){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"), dur);
+}
+
+function reasonBadge(r){
+  if(!r) return "";
+  const lc = r.toLowerCase();
+  if(lc.includes("stop"))  return `<span class="reason-badge rb-sl">SL</span>`;
+  if(lc.includes("target"))return `<span class="reason-badge rb-tp">TP</span>`;
+  if(lc.includes("force")) return `<span class="reason-badge rb-eod">EOD</span>`;
+  if(lc.includes("kill"))  return `<span class="reason-badge rb-kill">KILL</span>`;
+  return `<span class="reason-badge" style="background:var(--bg)">${r}</span>`;
+}
+
+/* ── Build symbol list ─────────────────────────────────────────── */
+function buildSymList(filter=""){
+  const list = $("symList");
+  const f = filter.trim().toUpperCase();
+  const syms = INSTRUMENTS.map(i=>i.symbol).filter(s=>!f||s.includes(f));
+  list.innerHTML = syms.map(s=>`
+    <button class="sym-btn${s===activeSym?" active":""}" onclick="selectSym('${s}')" id="sb-${s}">
+      <span>${s}</span>
+      <span class="sym-count" id="sc-${s}"></span>
+    </button>`).join("");
+}
+
+function filterSyms(){ buildSymList($("symSearch").value); }
+
+/* ── Select symbol ─────────────────────────────────────────────── */
+async function selectSym(sym){
+  // Update active state
+  if(activeSym){
+    const prev = $(`sb-${activeSym}`);
+    if(prev) prev.className="sym-btn";
+  }
+  activeSym = sym;
+  const btn = $(`sb-${sym}`);
+  if(btn) btn.className="sym-btn active";
+
+  $("mainTitle").textContent = sym;
+  $("btnExport").style.display = "inline-block";
+  await loadTrades();
+}
+
+/* ── Source toggle ─────────────────────────────────────────────── */
+let activeSource = 'backtest';   // 'backtest' | 'live'
+
+function setSource(src){
+  activeSource = src;
+  $("srcBt").style.background   = src==='backtest' ? '#fee2e2' : 'var(--bg)';
+  $("srcBt").style.color         = src==='backtest' ? 'var(--red2)' : 'var(--muted)';
+  $("srcLive").style.background  = src==='live'     ? '#dcfce7' : 'var(--bg)';
+  $("srcLive").style.color       = src==='live'     ? '#166534' : 'var(--muted)';
+  $("liveDate").style.display    = src==='live'     ? 'inline-block' : 'none';
+  $("btRunLabel").style.display  = src==='backtest' ? 'inline' : 'none';
+  if(activeSym) loadTrades();
+}
+setSource('backtest');  // default
+
+/* ── Load & render trades ──────────────────────────────────────── */
+async function loadTrades(){
+  if(!activeSym) return;
+
+  // Tag
+  const tag = $("dateTag");
+  if(activeSource === 'backtest'){
+    tag.className="tag tag-bt"; tag.textContent="Backtest";
+  } else {
+    tag.className="tag tag-live"; tag.textContent="Live";
+  }
+
+  $("tblContainer").innerHTML=`<div class="loader"><div class="spin"></div> Loading trades…</div>`;
+
+  let url;
+  if(activeSource === 'backtest'){
+    url = `/api/trades/${activeSym}?source=backtest`;
+  } else {
+    const d = $("liveDate").value;
+    url = `/api/trades/${activeSym}?source=live${d ? '&date='+d : ''}`;
+  }
+
+  const data = await fetch(url).then(r=>r.json()).catch(()=>null);
+
+  // Show run label for backtest
+  if(activeSource === 'backtest' && data?.label){
+    $("btRunLabel").textContent = data.label;
+  }
+
+  if(!data || !data.trades){
+    $("tblContainer").innerHTML=`<div class="empty"><div class="ei">❌</div><div class="et">Error loading trades</div></div>`;
+    return;
+  }
+
+  allTrades = data.trades;
+
+  // Update symbol count badge
+  const badge = $(`sc-${activeSym}`);
+  if(badge) badge.textContent = data.summary.total;
+
+  renderSummary(data.summary);
+  renderTable();
+}
+
+function renderSummary(s){
+  $("sTrades").textContent = s.total;
+  $("sWins").textContent   = s.wins;   $("sWins").className  = "sc-v pos";
+  $("sLoss").textContent   = s.losses; $("sLoss").className  = "sc-v neg";
+  $("sWR").textContent     = s.win_rate + "%";
+  $("sWR").className       = "sc-v " + (s.win_rate >= 50 ? "pos" : "neg");
+  $("sGross").textContent  = fmtP(s.gross); $("sGross").className = "sc-v " + cls(s.gross);
+  $("sChg").textContent    = "−₹" + Math.round(s.charges).toLocaleString();
+  $("sNet").textContent    = fmtP(s.net); $("sNet").className = "sc-v " + cls(s.net);
+}
+
+function clearSummary(){
+  ["sTrades","sWins","sLoss","sWR","sGross","sChg","sNet"].forEach(id=>{
+    $(id).textContent="—"; $(id).className="sc-v neu";
+  });
+}
+
+function renderTable(){
+  if(!allTrades.length){
+    $("tblContainer").innerHTML=`<div class="empty">
+      <div class="ei">📭</div>
+      <div class="et">No trades for this period</div>
+      <div class="es">Try a different date or run a backtest</div>
+    </div>`;
+    return;
+  }
+
+  const sorted = [...allTrades].sort((a,b)=>{
+    let av = a[sortKey] ?? "", bv = b[sortKey] ?? "";
+    if(typeof av === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    return sortAsc ? av - bv : bv - av;
+  });
+
+  const rows = sorted.map((t,i) => {
+    const net   = parseFloat(t.net_pnl ?? 0);
+    const gross = parseFloat(t.gross_pnl ?? 0);
+    const chg   = parseFloat(t.charges ?? 0);
+    const dir   = (t.direction || "").toUpperCase();
+    const pnlCls = net >= 0 ? "pos" : "neg";
+
+    // Duration
+    let dur = "";
+    if(t.entry_time && t.exit_time){
+      const ms = new Date(t.exit_time) - new Date(t.entry_time);
+      const mins = Math.round(ms / 60000);
+      dur = mins < 60 ? `${mins}m` : `${Math.floor(mins/60)}h${mins%60}m`;
+    }
+
+    return `<tr>
+      <td class="muted" style="font-size:11px">${i+1}</td>
+      <td class="dir-${dir.toLowerCase()}">${dir}</td>
+      <td>${t.entry_time ? String(t.entry_time).slice(0,16) : "—"}</td>
+      <td>${t.exit_time  ? String(t.exit_time).slice(0,16)  : "—"}</td>
+      <td class="muted">${dur}</td>
+      <td>₹${parseFloat(t.entry_price ?? 0).toFixed(2)}</td>
+      <td>₹${parseFloat(t.exit_price  ?? 0).toFixed(2)}</td>
+      <td>${t.qty ?? "—"}</td>
+      <td class="${cls(gross)}">₹${Math.round(gross).toLocaleString()}</td>
+      <td class="neg">−₹${Math.round(chg).toLocaleString()}</td>
+      <td class="${pnlCls}" style="font-weight:700">${net>=0?"+":""}₹${Math.round(net).toLocaleString()}</td>
+      <td>${reasonBadge(t.reason)}</td>
+    </tr>`;
+  }).join("");
+
+  $("tblContainer").innerHTML = `
+    <table class="tlog">
+      <thead><tr>
+        <th>#</th>
+        <th onclick="sortBy('direction')">Dir</th>
+        <th onclick="sortBy('entry_time')" class="${sortKey==='entry_time'?'sorted':''}">Entry Time</th>
+        <th onclick="sortBy('exit_time')"  class="${sortKey==='exit_time'?'sorted':''}">Exit Time</th>
+        <th>Duration</th>
+        <th onclick="sortBy('entry_price')">Entry ₹</th>
+        <th onclick="sortBy('exit_price')">Exit ₹</th>
+        <th onclick="sortBy('qty')">Qty</th>
+        <th onclick="sortBy('gross_pnl')" class="${sortKey==='gross_pnl'?'sorted':''}">Gross</th>
+        <th>Charges</th>
+        <th onclick="sortBy('net_pnl')" class="${sortKey==='net_pnl'?'sorted':''}">Net PnL</th>
+        <th>Reason</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function sortBy(key){
+  sortKey === key ? sortAsc = !sortAsc : (sortKey = key, sortAsc = true);
+  renderTable();
+}
+
+/* ── CSV export ────────────────────────────────────────────────── */
+function exportCSV(){
+  if(!allTrades.length){ toast("No trades to export"); return; }
+  const cols = ["direction","entry_time","exit_time","entry_price","exit_price",
+                "qty","gross_pnl","charges","net_pnl","reason"];
+  const lines = [cols.join(","), ...allTrades.map(t=>cols.map(c=>t[c]??"").join(","))];
+  const blob  = new Blob([lines.join("\n")], {type:"text/csv"});
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement("a");
+  a.href=url; a.download=`${activeSym}_${activeDate}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast("✅ CSV downloaded");
+}
+
+/* ── Init ──────────────────────────────────────────────────────── */
+buildSymList();
+
+// If URL has ?symbol=X, auto-select it
+const urlSym = new URLSearchParams(location.search).get("symbol");
+if(urlSym) selectSym(urlSym.toUpperCase());
+</script>
+</body>
+</html>

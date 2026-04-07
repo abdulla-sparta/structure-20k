@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StructureEngine — Backtest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#e53e3e;--red2:#c53030;--red-grad:linear-gradient(135deg,#c53030 0%,#e53e3e 50%,#fc8181 100%);
+  --bg:#f7f8fa;--surface:#fff;--border:#e8eaed;--text:#1a1d23;--muted:#6b7280;
+  --green:#16a34a;--amber:#d97706;--blue:#2563eb;
+  --sidebar:260px;
+}
+html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+.header{height:52px;background:var(--red-grad);display:flex;align-items:center;padding:0 18px;gap:16px;box-shadow:0 2px 12px rgba(197,48,48,.35);position:relative;z-index:200;flex-shrink:0;}
+.hdr-logo{display:flex;align-items:center;gap:10px}
+.hdr-logo-mark{width:30px;height:30px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;border:1px solid rgba(255,255,255,.3)}
+.hdr-logo-name{font-size:14px;font-weight:700;color:#fff;letter-spacing:.3px}
+.hdr-badge{background:rgba(255,255,255,.2);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.8px;border:1px solid rgba(255,255,255,.3)}
+.hdr-sep{width:1px;height:22px;background:rgba(255,255,255,.25)}
+.hdr-nav{display:flex;gap:4px}
+.hdr-tab{padding:6px 14px;border-radius:7px;color:rgba(255,255,255,.75);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px}
+.hdr-tab:hover{background:rgba(255,255,255,.15);color:#fff}
+.hdr-tab.active{background:rgba(255,255,255,.22);color:#fff;font-weight:600}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.locked-pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer}
+.btn-live{background:#fff;color:var(--red2);border:none;padding:7px 16px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:opacity .15s;white-space:nowrap}
+.btn-live:hover{opacity:.9}
+.app{display:flex;height:calc(100vh - 52px);overflow:hidden}
+.lpanel{width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;}
+.lp-header{padding:12px 14px 10px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#fff5f5 0%,#fff 100%);flex-shrink:0;}
+.lp-title{font-size:11px;font-weight:700;color:var(--red2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.lp-count{background:#fee2e2;color:var(--red2);font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px}
+.add-row{display:flex;gap:6px}
+.add-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;background:var(--bg);color:var(--text)}
+.add-input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(229,62,62,.12)}
+.add-input::placeholder{text-transform:none;font-family:'Inter',sans-serif;color:var(--muted)}
+.btn-add{padding:7px 12px;border-radius:7px;border:none;background:var(--red);color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:background .15s;flex-shrink:0}
+.btn-add:hover{background:var(--red2)}
+.sym-list{flex:1;overflow-y:auto;padding:8px 10px}
+.sym-list::-webkit-scrollbar{width:4px}
+.sym-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sym-item{display:flex;align-items:center;gap:6px;padding:8px 9px;border-radius:8px;flex-wrap:wrap;border:1px solid transparent;margin-bottom:4px;cursor:default;transition:border-color .15s,background .15s}
+.sym-item:hover{background:var(--bg);border-color:var(--border)}
+.sym-item.selected{background:#fff5f5;border-color:#fca5a5}
+.sym-check{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);cursor:pointer;appearance:none;flex-shrink:0;transition:all .15s;position:relative}
+.sym-check:checked{background:var(--red);border-color:var(--red)}
+.sym-check:checked::after{content:'✓';position:absolute;top:-1px;left:2px;font-size:11px;color:#fff;font-weight:700}
+.sym-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background .4s}
+.sym-dot.ok{background:var(--green)}
+.sym-dot.cached{background:#86efac}
+.sym-dot.fetching{background:var(--amber);animation:blink .8s ease-in-out infinite}
+.sym-dot.failed{background:var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.sym-name{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sym-remove{width:20px;height:20px;border-radius:50%;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:0;transition:opacity .15s}
+.sym-item:hover .sym-remove{opacity:1}
+.sym-remove:hover{background:#fee2e2;color:var(--red)}
+.confirm-bar{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;background:linear-gradient(180deg,#fff 0%,#fff5f5 100%)}
+.sel-info{font-size:11px;color:var(--muted);margin-bottom:8px;text-align:center}
+.sel-info strong{color:var(--red2)}
+.btn-confirm{width:100%;padding:9px;border-radius:8px;border:none;background:var(--red-grad);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-confirm:hover{opacity:.9}
+.btn-confirm:disabled{opacity:.4;cursor:not-allowed}
+.lp-sect{padding:8px 14px 4px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;background:var(--bg);border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-shrink:0}
+.preset-list{padding:6px 10px;flex-shrink:0}
+.preset-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:8px;border:1px solid var(--border);margin-bottom:4px;cursor:pointer;transition:all .15s;background:var(--surface)}
+.preset-row:hover{border-color:#fca5a5;background:#fff5f5}
+.preset-row.active{border-color:var(--red);background:#fff5f5}
+.preset-row.locked{border-color:var(--red2);background:#fee2e2}
+.pr-name{font-size:12px;font-weight:600}
+.pr-ret{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600}
+.pr-ret.pos{color:var(--green)}.pr-ret.neg{color:var(--red)}.pr-ret.neu{color:var(--muted)}
+.slot-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.slot-actions{display:flex;gap:4px;margin-top:5px}
+.slot-btn{padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--surface);font-size:10px;cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;transition:all .15s}
+.slot-btn:hover{border-color:var(--red);color:var(--red)}
+.empty-slot{font-size:11px;color:var(--muted);font-style:italic}
+.cpanel{width:200px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.cp-head{padding:12px 14px 8px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#fff5f5 0%,#fff 100%);flex-shrink:0}
+.cp-title{font-size:10px;font-weight:700;color:var(--red2);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px}
+.cg{margin-bottom:10px}
+.cg label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500}
+.cg input{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:'JetBrains Mono',monospace;background:var(--bg)}
+.cg input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(229,62,62,.1)}
+.btn-run{width:100%;padding:9px;border-radius:8px;border:none;background:var(--red-grad);color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:6px;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-run:hover{opacity:.9}.btn-run:disabled{opacity:.4;cursor:not-allowed}
+.btn-sec{width:100%;padding:7px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:4px;transition:all .15s}
+.btn-sec:hover{border-color:var(--red);color:var(--red)}
+.btn-lock{width:100%;padding:7px;border-radius:7px;border:none;background:#fee2e2;color:var(--red2);font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-top:4px;transition:opacity .15s}
+.btn-lock:hover{opacity:.85}
+.btn-reclassify{width:100%;padding:8px;border-radius:7px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-top:8px;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-reclassify:hover{background:#dbeafe;border-color:#93c5fd}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.status-bar{padding:8px 18px;display:flex;align-items:center;gap:10px;font-size:12px;flex-shrink:0;border-bottom:1px solid var(--border)}
+.status-bar.idle{background:#f7f8fa;color:var(--muted)}
+.status-bar.fetching{background:#fffbeb;color:#92400e;border-color:#fef3c7}
+.status-bar.ready{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+.status-bar.running{background:#fff5f5;color:var(--red2);border-color:#fca5a5}
+.status-bar.done{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+.spin{width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.met{padding:10px 14px;border-right:1px solid var(--border);text-align:center}
+.met:last-child{border-right:none}
+.met-l{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.met-v{font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.met-v.pos{color:var(--green)}.met-v.neg{color:var(--red)}.met-v.neu{color:var(--muted)}
+.met-bar{height:2px;margin-top:5px;border-radius:1px;background:var(--border)}
+.met-fill{height:100%;border-radius:1px;transition:width .5s}
+.tbl-wrap{flex:1;overflow-y:auto}
+.tbl-wrap::-webkit-scrollbar{width:5px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.tbl-head-row{display:flex;align-items:center;gap:12px;padding:8px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.tbl-head-row h3{font-size:13px;font-weight:700}
+.tag{font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px}
+.tag-red{background:#fee2e2;color:var(--red2)}
+.tag-green{background:#dcfce7;color:var(--green)}
+.tag-blue{background:#dbeafe;color:var(--blue)}
+.tbl-hint{margin-left:auto;font-size:11px;color:var(--muted)}
+table.rt{width:100%;border-collapse:collapse;font-size:12px}
+.rt thead th{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#fff5f5 0%,#fff 100%);padding:9px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid #fca5a5;cursor:pointer;user-select:none;white-space:nowrap}
+.rt thead th:hover{color:var(--red)}
+.rt thead th.sorted{color:var(--red2)}
+.rt tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+.rt tbody tr:hover{background:#fff5f5}
+.cfg-badge{display:inline-block;font-size:9.5px;color:var(--muted);background:#f5f5f5;border:1px solid #e8e8e8;border-radius:3px;padding:1px 5px;margin-right:3px;font-family:monospace}
+.cfg-badge.t1{background:#dcfce7;border-color:#86efac;color:#15803d}
+.cfg-badge.t2{background:#fef9c3;border-color:#fde047;color:#854d0e}
+.cfg-badge.skip{background:#f8f8f8;border-color:#ddd;color:#aaa}
+.rt tbody tr.err{opacity:.45}
+.rt td{padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap}
+.rt td.sym{font-family:'Inter',sans-serif;font-weight:700;font-size:13px}
+.rt td.pos{color:var(--green);font-weight:600}
+.rt td.neg{color:var(--red);font-weight:600}
+.rt td.neu{color:var(--muted)}
+.rank-badge{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;font-weight:800;margin-right:4px}
+.rk1{background:#ffd700;color:#000}.rk2{background:#c0c0c0;color:#000}.rk3{background:#cd7f32;color:#fff}
+.empty-tbl{padding:60px 0;text-align:center;color:var(--muted)}
+.empty-tbl .ei{font-size:40px;margin-bottom:12px;opacity:.3}
+.empty-tbl .et{font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px}
+.empty-tbl .es{font-size:12px;line-height:1.6;max-width:320px;margin:0 auto}
+.steps{display:flex;align-items:center;gap:6px;margin-left:auto;padding-right:4px}
+.step{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:500}
+.step-num{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.step.done .step-num{background:var(--green);border-color:var(--green);color:#fff}
+.step.active .step-num{background:var(--red);border-color:var(--red);color:#fff}
+.step.active{color:var(--red2)}
+.step-arrow{color:var(--border);font-size:10px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;display:none;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:24px;width:320px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+.modal select{width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:16px;font-family:'Inter',sans-serif}
+.modal-acts{display:flex;gap:8px;justify-content:flex-end}
+.mbtn{padding:8px 16px;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif}
+.mbtn-p{background:var(--red-grad);color:#fff}
+.mbtn-s{background:var(--bg);color:var(--text)}
+.prog-panel{position:fixed;bottom:20px;right:20px;width:340px;background:#fff;border-radius:14px;border:1px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,.15);z-index:400;overflow:hidden;transform:translateY(20px);opacity:0;transition:all .3s;pointer-events:none;}
+.prog-panel.show{transform:translateY(0);opacity:1;pointer-events:all}
+.prog-head{padding:12px 14px;background:var(--red-grad);display:flex;align-items:center;justify-content:space-between}
+.prog-head-title{font-size:12px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px}
+.prog-head-pct{font-size:13px;font-weight:800;color:#fff;font-family:'JetBrains Mono',monospace}
+.prog-bar-wrap{height:3px;background:rgba(255,255,255,.3)}
+.prog-bar-fill{height:100%;background:#fff;transition:width .4s;border-radius:0}
+.prog-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid var(--border)}
+.prog-stat{padding:8px 12px;text-align:center;border-right:1px solid var(--border)}
+.prog-stat:last-child{border-right:none}
+.ps-l{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.ps-v{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.prog-sym-wrap{max-height:220px;overflow-y:auto;padding:8px 10px}
+.prog-sym-wrap::-webkit-scrollbar{width:3px}
+.prog-sym-wrap::-webkit-scrollbar-thumb{background:var(--border)}
+.prog-sym-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;margin-bottom:2px;font-size:12px;transition:background .15s}
+.prog-sym-row.done-ok{background:#f0fdf4}
+.prog-sym-row.done-err{background:#fff5f5}
+.prog-sym-row.pending{background:var(--bg)}
+.prog-sym-row.running{background:#fffbeb}
+.ps-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ps-dot.pending{background:var(--border)}
+.ps-dot.running{background:var(--amber);animation:blink .6s ease-in-out infinite}
+.ps-dot.ok{background:var(--green)}
+.ps-dot.err{background:var(--red)}
+.ps-sym{font-family:'JetBrains Mono',monospace;font-weight:600;flex:1;font-size:11px}
+.ps-ret{font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;margin-left:auto}
+.ps-ret.pos{color:var(--green)}.ps-ret.neg{color:var(--red)}.ps-ret.neu{color:var(--muted)}
+.prog-footer{padding:8px 14px;background:#f7f8fa;border-top:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+.prog-close{background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:0}
+.prog-close:hover{color:var(--red)}
+.tl-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:600;display:none;align-items:flex-end}
+.tl-overlay.open{display:flex}
+.tl-drawer{width:100%;max-height:70vh;background:#fff;border-radius:16px 16px 0 0;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.15);animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.tl-head{padding:14px 18px;background:var(--red-grad);border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.tl-head-left{display:flex;align-items:center;gap:10px}
+.tl-head-sym{font-size:16px;font-weight:800;color:#fff;letter-spacing:.5px}
+.tl-head-badge{background:rgba(255,255,255,.2);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.3)}
+.tl-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+.tl-close:hover{background:rgba(255,255,255,.35)}
+.tl-summary{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--border);flex-shrink:0}
+.tl-stat{padding:10px 14px;text-align:center;border-right:1px solid var(--border)}
+.tl-stat:last-child{border-right:none}
+.tl-sl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px}
+.tl-sv{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.tl-body{flex:1;overflow-y:auto;padding:0}
+.tl-body::-webkit-scrollbar{width:4px}
+.tl-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.tl-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px}
+table.tl-table{width:100%;border-collapse:collapse;font-size:12px}
+.tl-table thead th{position:sticky;top:0;background:#fff5f5;padding:8px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:2px solid #fca5a5;white-space:nowrap}
+.tl-table tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+.tl-table tbody tr:hover{background:#fff5f5}
+.tl-table td{padding:9px 14px;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.tl-table td.dir-buy{color:var(--blue);font-weight:700}
+.tl-table td.dir-sell{color:var(--red);font-weight:700}
+.tl-table td.pos{color:var(--green);font-weight:600}
+.tl-table td.neg{color:var(--red);font-weight:600}
+.tl-table td.neu{color:var(--muted)}
+.tl-footer{padding:8px 16px;background:#f7f8fa;border-top:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.toast{position:fixed;bottom:24px;right:24px;background:#1a1d23;color:#fff;padding:10px 18px;border-radius:10px;font-size:12px;font-weight:500;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+
+<header class="header">
+  <div class="hdr-logo">
+    <div class="hdr-logo-mark">SE</div>
+    <span class="hdr-logo-name">STRUCTUREENGINE</span>
+    <span class="hdr-badge">BACKTEST</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <nav class="hdr-nav">
+    <div class="hdr-tab active">📈 Backtest</div>
+    <div class="hdr-tab" onclick="location.href='/live'">⚡ Live</div>
+    <div class="hdr-tab" onclick="location.href='/heatmap'">🔥 Heatmap</div>
+    <div class="hdr-tab" onclick="location.href='/trade_log'">📋 Trade Log</div>
+    <div class="hdr-tab" onclick="location.href='/signals'">📡 Signals</div>
+    <div class="hdr-tab" onclick="location.href='/ob'">📖 OB</div>
+  </nav>
+  <div class="steps" id="stepBar">
+    <div class="step active" id="s1"><div class="step-num">1</div><span>Select</span></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="s2"><div class="step-num">2</div><span>Fetch</span></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="s3"><div class="step-num">3</div><span>Backtest</span></div>
+  </div>
+  <div class="hdr-right">
+    <div class="locked-pill" id="lockedPill" onclick="location.href='/live'">🔒 —</div>
+    <button class="btn-live" onclick="location.href='/live'">Live Dashboard →</button>
+  </div>
+</header>
+
+<div class="app">
+
+<!-- LEFT PANEL -->
+<aside class="lpanel">
+  <div class="lp-header">
+    <div class="lp-title">
+      Symbols
+      <span class="lp-count" id="symCount">{{ instruments|length }}/50</span>
+    </div>
+    <div class="add-row">
+      <input type="text" id="addInp" class="add-input" placeholder="Add symbol…"
+             maxlength="20" onkeydown="if(event.key==='Enter')doAdd()">
+      <button class="btn-add" onclick="doAdd()">+</button>
+    </div>
+  </div>
+
+  <div class="sym-list" id="symList">
+    {% for inst in instruments %}
+    <label class="sym-item" id="si-{{inst.symbol}}">
+      <input type="checkbox" class="sym-check" checked
+             onchange="onCheck('{{inst.symbol}}',this.checked)">
+      <div class="sym-dot" id="dot-{{inst.symbol}}" title="No data yet"></div>
+      <span class="sym-name">{{inst.symbol}}</span>
+      <button class="sym-remove" onclick="removeSym(event,'{{inst.symbol}}')" title="Remove">✕</button>
+    </label>
+    {% endfor %}
+  </div>
+
+  <div style="padding:6px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0">
+    <button onclick="selAll(true)"  style="flex:1;padding:5px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:11px;cursor:pointer;font-family:'Inter',sans-serif">All</button>
+    <button onclick="selAll(false)" style="flex:1;padding:5px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:11px;cursor:pointer;font-family:'Inter',sans-serif">None</button>
+  </div>
+
+  <div class="confirm-bar">
+    <div class="sel-info"><strong id="selNum">{{ instruments|length }}</strong> symbols selected</div>
+    <button class="btn-confirm" id="btnConfirm" onclick="confirmAndFetch()">
+      ✓ Confirm &amp; Fetch History
+    </button>
+  </div>
+
+  <div class="lp-sect">Saved Configs</div>
+  <div class="preset-list">
+    {% for s in slots %}
+    <div class="preset-row {% if locked and locked.name==s.name %}locked{% endif %}"
+         id="sc-{{loop.index}}">
+      <div style="width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="pr-name">{{s.name}}</div>
+          <span class="pr-ret neu" id="sret-{{loop.index}}">—</span>
+        </div>
+        {% if s.empty %}
+          <div class="empty-slot">Empty</div>
+        {% else %}
+          <div class="slot-meta">risk={{s.risk_per_trade}} · rr={{s.rr_target}} · cd={{s.cooldown}}</div>
+          <div class="slot-actions">
+            <button class="slot-btn" onclick="loadSlot('{{s.name}}')">Load</button>
+            <button class="slot-btn" onclick="lockSlot('{{s.name}}')">Lock</button>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</aside>
+
+<!-- CONFIG PANEL -->
+<aside class="cpanel">
+  <div class="cp-head">
+    <div class="cp-title">Strategy Config</div>
+    <div class="cg"><label>Risk % per trade</label>
+      <input type="number" id="fRisk" step="0.005" min="0.001" max="0.5" value="{{ config.risk_per_trade }}">
+    </div>
+    <div class="cg"><label>RR Target</label>
+      <input type="number" id="fRR" step="0.5" min="1" value="{{ config.rr_target }}">
+    </div>
+    <div class="cg"><label>Cooldown (5m candles)</label>
+      <input type="number" id="fCD" step="5" min="5" value="{{ config.cooldown }}">
+    </div>
+    <div class="cg"><label>Min Price Distance (₹)</label>
+      <input type="number" id="fMPD" step="1" min="0" value="{{ config.min_price_distance }}">
+    </div>
+    <button class="btn-run" id="btnRun" onclick="runBT()" disabled>
+      ▶ Run Backtest
+    </button>
+    <button class="btn-sec" onclick="openSaveModal()">💾 Save to Slot…</button>
+    <button class="btn-lock" onclick="lockCurrent()">🔒 Lock for Live</button>
+
+    <!-- ── RECLASSIFY SECTION ── -->
+    <div style="height:1px;background:var(--border);margin:12px 0"></div>
+    <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">Tier Classification</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.5">Updates T1/T2/T3 tier map in DB. T3 symbols are skipped in live trading.</div>
+    <button class="btn-reclassify" onclick="runReclassify()">🔄 Reclassify Symbols</button>
+    <div id="reclassifyStatus" style="display:none;font-size:10px;color:var(--muted);padding:6px 8px;background:var(--bg);border-radius:6px;line-height:1.5;margin-top:6px"></div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="status-bar idle" id="statusBar">
+    <span id="statusMsg">← Select symbols on the left, then click Confirm &amp; Fetch History</span>
+  </div>
+
+  <div class="metrics">
+    <div class="met"><div class="met-l">Avg Return</div><div class="met-v neu" id="mRet">—</div><div class="met-bar"><div class="met-fill" id="mRetFill" style="width:0%;background:var(--red)"></div></div></div>
+    <div class="met"><div class="met-l">Total Net PnL</div><div class="met-v neu" id="mNet">—</div><div class="met-bar"><div class="met-fill" id="mNetFill" style="width:0%;background:var(--green)"></div></div></div>
+    <div class="met"><div class="met-l">Total Gross</div><div class="met-v neu" id="mGross">—</div><div class="met-bar"><div class="met-fill" style="width:50%;background:#ccc"></div></div></div>
+    <div class="met"><div class="met-l">Total Charges</div><div class="met-v neu" id="mChg">—</div><div class="met-bar"><div class="met-fill" id="mChgFill" style="width:0%;background:var(--red)"></div></div></div>
+    <div class="met"><div class="met-l">Total Trades</div><div class="met-v neu" id="mTrd">—</div><div class="met-bar"><div class="met-fill" style="width:40%;background:#ccc"></div></div></div>
+    <div class="met"><div class="met-l">Avg Win Rate</div><div class="met-v neu" id="mWR">—</div><div class="met-bar"><div class="met-fill" id="mWRFill" style="width:0%;background:var(--green)"></div></div></div>
+  </div>
+
+  <div class="tbl-head-row">
+    <h3>Backtest Results</h3>
+    <span class="tag tag-red" id="tagCfg">Custom</span>
+    <span class="tag tag-green" id="tagSym">0 symbols</span>
+    <span class="tbl-hint">Sorted by Return % ↓ · Click header to resort</span>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="rt" id="resTable">
+      <thead><tr>
+        <th onclick="sortBy('rank')">#</th>
+        <th onclick="sortBy('symbol')">Symbol</th>
+        <th onclick="sortBy('balance')">Balance</th>
+        <th onclick="sortBy('return_pct')" class="sorted">Return %</th>
+        <th onclick="sortBy('net_pnl')">Net PnL</th>
+        <th onclick="sortBy('gross_pnl')">Gross PnL</th>
+        <th onclick="sortBy('charges')">Charges</th>
+        <th onclick="sortBy('trades')">Trades</th>
+        <th onclick="sortBy('win_rate')">Win Rate</th>
+        <th style="font-size:10px;color:var(--muted)">Config</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="resBody">
+        <tr><td colspan="11">
+          <div class="empty-tbl">
+            <div class="ei">📊</div>
+            <div class="et">No results yet</div>
+            <div class="es">Select your symbols → Confirm &amp; Fetch History → Run Backtest</div>
+          </div>
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+</div>
+
+<!-- TRADE LOG DRAWER -->
+<div class="tl-overlay" id="tlOverlay" onclick="closeTL(event)">
+  <div class="tl-drawer" onclick="event.stopPropagation()">
+    <div class="tl-head">
+      <div class="tl-head-left">
+        <span class="tl-head-sym" id="tlSym">—</span>
+        <span class="tl-head-badge">BACKTEST</span>
+        <span class="tl-head-badge" id="tlConfig" style="background:rgba(255,255,255,.1)">Custom</span>
+      </div>
+      <button class="tl-close" onclick="closeTLBtn()">✕</button>
+    </div>
+    <div class="tl-summary">
+      <div class="tl-stat"><div class="tl-sl">Trades</div><div class="tl-sv" id="tlTotal">0</div></div>
+      <div class="tl-stat"><div class="tl-sl">Wins</div><div class="tl-sv pos" id="tlWins">0</div></div>
+      <div class="tl-stat"><div class="tl-sl">Losses</div><div class="tl-sv neg" id="tlLoss">0</div></div>
+      <div class="tl-stat"><div class="tl-sl">Win Rate</div><div class="tl-sv" id="tlWR">0%</div></div>
+      <div class="tl-stat"><div class="tl-sl">Net PnL</div><div class="tl-sv" id="tlNet">—</div></div>
+      <div class="tl-stat"><div class="tl-sl">Charges</div><div class="tl-sv neg" id="tlChg">—</div></div>
+    </div>
+    <div class="tl-body">
+      <div class="tl-empty" id="tlEmpty">Click a symbol row in the results table to view its trades</div>
+      <table class="tl-table" id="tlTable" style="display:none">
+        <thead><tr>
+          <th>#</th><th>Dir</th><th>Entry Time</th><th>Exit Time</th>
+          <th>Entry ₹</th><th>Exit ₹</th><th>Qty</th>
+          <th>Gross</th><th>Charges</th><th>Net PnL</th><th>Reason</th>
+        </tr></thead>
+        <tbody id="tlBody"></tbody>
+      </table>
+    </div>
+    <div class="tl-footer">
+      <span id="tlFooter">In-memory · refreshes on next backtest run</span>
+      <span style="font-size:10px;color:var(--muted)">Live trades → Live Dashboard</span>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS PANEL -->
+<div class="prog-panel" id="progPanel">
+  <div class="prog-head">
+    <div class="prog-head-title">
+      <div class="spin" id="progSpin" style="border-color:rgba(255,255,255,.4);border-top-color:#fff"></div>
+      <span id="progTitle">Running Backtest…</span>
+    </div>
+    <span class="prog-head-pct" id="progPct">0%</span>
+  </div>
+  <div class="prog-bar-wrap"><div class="prog-bar-fill" id="progBar" style="width:0%"></div></div>
+  <div class="prog-stats">
+    <div class="prog-stat"><div class="ps-l">Done</div><div class="ps-v" id="psDone">0</div></div>
+    <div class="prog-stat"><div class="ps-l">Total</div><div class="ps-v" id="psTotal">0</div></div>
+    <div class="prog-stat"><div class="ps-l">Config</div><div class="ps-v" id="psCfg" style="font-size:11px">—</div></div>
+  </div>
+  <div class="prog-sym-wrap" id="progSymWrap"></div>
+  <div class="prog-footer">
+    <span id="progFooter">Waiting…</span>
+    <button class="prog-close" onclick="closeProgPanel()" title="Minimise">✕</button>
+  </div>
+</div>
+
+<!-- SAVE SLOT MODAL -->
+<div class="modal-bg" id="saveModal">
+  <div class="modal">
+    <h3>Save Config to Slot</h3>
+    <p>This will overwrite the selected slot with your current settings.</p>
+    <select id="slotSel">
+      {% for name in slot_names %}<option>{{name}}</option>{% endfor %}
+    </select>
+    <div class="modal-acts">
+      <button class="mbtn mbtn-s" onclick="closeSave()">Cancel</button>
+      <button class="mbtn mbtn-p" onclick="doSave()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MAX = 50;
+let selectedSyms = new Set([...document.querySelectorAll('.sym-check:checked')].map(c=>c.closest('.sym-item').querySelector('.sym-name').textContent.trim()));
+let fetchDone   = false;
+let allResults  = {};
+let activeConf  = 'Custom';
+let sortKey     = 'return_pct', sortAsc = false;
+
+const $  = id => document.getElementById(id);
+const fmt = n => n==null?'—':(Math.abs(n)>=100000?'₹'+Math.round(n/1000)+'k':'₹'+Math.round(n));
+const fPct = n => (n>0?'+':'')+Number(n).toFixed(2)+'%';
+const cls  = n => n==null?'neu':n>=0?'pos':'neg';
+
+function toast(msg, dur=3500){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),dur);
+}
+function setStep(n){
+  [1,2,3].forEach(i=>{
+    const el=$('s'+i);
+    el.className='step'+(i<n?' done':i===n?' active':'');
+  });
+}
+function setStatus(type,msg,spin=false){
+  const b=$('statusBar'), m=$('statusMsg');
+  b.className='status-bar '+type;
+  m.innerHTML=(spin?'<div class="spin"></div> ':'')+msg;
+}
+
+function onCheck(sym, checked){
+  checked ? selectedSyms.add(sym) : selectedSyms.delete(sym);
+  const row = document.getElementById('si-'+sym);
+  if(row) row.className='sym-item'+(checked?' selected':'');
+  updateSelCount();
+}
+
+function updateSelCount(){
+  $('selNum').textContent = selectedSyms.size;
+  $('tagSym').textContent = selectedSyms.size+' symbols';
+  $('btnConfirm').disabled = selectedSyms.size === 0;
+  fetchDone = false;
+  $('btnRun').disabled = true;
+  setStep(1);
+}
+
+function selAll(v){
+  document.querySelectorAll('.sym-check').forEach(cb=>{
+    cb.checked=v;
+    const sym=cb.closest('.sym-item').querySelector('.sym-name').textContent.trim();
+    v ? selectedSyms.add(sym) : selectedSyms.delete(sym);
+    cb.closest('.sym-item').className='sym-item'+(v?' selected':'');
+  });
+  updateSelCount();
+}
+
+function doAdd(){
+  const inp=$('addInp');
+  const sym=inp.value.trim().toUpperCase().replace(/\s+/g,'-');
+  if(!sym){toast('Enter a symbol name');return;}
+  if(document.getElementById('si-'+sym)){toast(sym+' already in list');return;}
+  const total=document.querySelectorAll('.sym-item').length;
+  if(total>=MAX){toast('Max '+MAX+' symbols reached');return;}
+  fetch('/add_symbol',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbol:sym,token:'NSE_EQ|'+sym,margin_pct:0.20})})
+  .then(r=>r.json()).then(d=>{
+    if(d.status!=='ok'){toast('❌ '+d.message);return;}
+    const list=$('symList');
+    const row=document.createElement('label');
+    row.className='sym-item selected'; row.id='si-'+sym;
+    row.innerHTML=`
+      <input type="checkbox" class="sym-check" checked onchange="onCheck('${sym}',this.checked)">
+      <div class="sym-dot fetching" id="dot-${sym}" title="Pending…"></div>
+      <span class="sym-name">${sym}</span>
+      <button class="sym-remove" onclick="removeSym(event,'${sym}')" title="Remove">✕</button>`;
+    list.appendChild(row);
+    selectedSyms.add(sym);
+    inp.value='';
+    updateSelCount();
+    updateSymCount();
+    toast('✅ '+sym+' added');
+  });
+}
+
+function removeSym(e, sym){
+  e.preventDefault(); e.stopPropagation();
+  fetch('/remove_symbol',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbol:sym})}).then(()=>{
+    const row=document.getElementById('si-'+sym);
+    if(row)row.remove();
+    selectedSyms.delete(sym);
+    updateSelCount(); updateSymCount();
+    toast(sym+' removed');
+  });
+}
+
+function updateSymCount(){
+  const n=document.querySelectorAll('.sym-item').length;
+  $('symCount').textContent=n+'/'+MAX;
+}
+
+function confirmAndFetch(){
+  if(selectedSyms.size===0){toast('Select at least one symbol');return;}
+  $('btnConfirm').disabled=true;
+  setStep(2);
+  setStatus('fetching','Fetching 6-month history for '+selectedSyms.size+' symbols…',true);
+  selectedSyms.forEach(sym=>{
+    const dot=document.getElementById('dot-'+sym);
+    if(dot){dot.className='sym-dot fetching';dot.title='Fetching…';}
+  });
+  fetch('/refetch_all',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbols:[...selectedSyms]})})
+  .then(()=>pollFetch());
+}
+
+function pollFetch(){
+  fetch('/fetch_status').then(r=>r.json()).then(s=>{
+    const res=s.results||{};
+    let fetching=0, ok=0, fail=0;
+    selectedSyms.forEach(sym=>{
+      const st=res[sym];
+      const dot=document.getElementById('dot-'+sym);
+      if(!dot)return;
+      if(!st||st==='fetching'){fetching++;dot.className='sym-dot fetching';dot.title='Fetching…';}
+      else if(st==='ok'||st==='cached'){ok++;dot.className='sym-dot '+(st==='cached'?'cached':'ok');dot.title=st;}
+      else{fail++;dot.className='sym-dot failed';dot.title='Failed: '+st;}
+    });
+    const done=ok+fail, total=selectedSyms.size;
+    setStatus('fetching',`Fetching history… ${done}/${total} symbols done (${ok} OK, ${fail} failed)`,true);
+    if(s.done||fetching===0){
+      if(ok>0){
+        setStatus('ready',`✅ ${ok}/${total} symbols ready — click Run Backtest`);
+        setStep(3); fetchDone=true; $('btnRun').disabled=false; $('btnConfirm').disabled=false;
+        if(fail>0) toast(`⚠️ ${fail} symbols failed — they'll be skipped`);
+        else toast(`✅ All ${ok} symbols fetched — ready to backtest!`);
+      } else {
+        setStatus('idle','❌ All fetches failed. Check your Upstox token.');
+        $('btnConfirm').disabled=false; setStep(1);
+      }
+    } else { setTimeout(pollFetch,2000); }
+  }).catch(()=>setTimeout(pollFetch,3000));
+}
+
+function runBT(){
+  if(!fetchDone){toast('Please fetch history first');return;}
+  const cfg=getCfg();
+  $('btnRun').disabled=true; $('btnRun').textContent='⏳ Running…';
+  setStatus('running','Running backtest for '+selectedSyms.size+' symbols…',true);
+  $('tagCfg').textContent=cfg.name||'Custom';
+  $('progPanel').classList.add('show'); _progVisible=true;
+  $('progSymWrap').innerHTML = [...selectedSyms].map(s=>
+    `<div class="prog-sym-row pending"><div class="ps-dot pending"></div><span class="ps-sym">${s}</span><span class="ps-ret neu">…</span></div>`
+  ).join('');
+  $('psTotal').textContent = selectedSyms.size;
+  $('psDone').textContent  = '0';
+  $('progPct').textContent = '0%';
+  $('progBar').style.width = '0%';
+  startPollProgress();
+  fetch('/run_backtest',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({...cfg, symbols:[...selectedSyms]})})
+  .then(r=>r.json()).then(data=>{
+    allResults=data; activeConf='Custom';
+    renderTable('Custom');
+    $('btnRun').disabled=false; $('btnRun').textContent='▶ Run Backtest';
+    const n=(data['Custom']||[]).filter(r=>!r.error).length;
+    setStatus('done','✅ Backtest complete — '+n+' symbols · sorted by Return %');
+    toast('✅ Done! '+n+' symbols backtested');
+  }).catch(e=>{
+    $('btnRun').disabled=false; $('btnRun').textContent='▶ Run Backtest';
+    setStatus('idle','❌ Backtest error: '+e.message);
+  });
+}
+
+function getCfg(){
+  return{
+    name:'Custom',
+    risk_per_trade:    parseFloat($('fRisk').value)||0.01,
+    rr_target:         parseFloat($('fRR').value)||3,
+    cooldown:          parseInt($('fCD').value)||300,
+    min_price_distance:parseFloat($('fMPD').value)||5,
+  };
+}
+
+function renderTable(cfgName){
+  const rows=allResults[cfgName]; if(!rows)return;
+  activeConf=cfgName; $('tagCfg').textContent=cfgName;
+  const sorted=[...rows].sort((a,b)=>{
+    const av=a[sortKey]??-9999, bv=b[sortKey]??-9999;
+    return sortAsc?av-bv:bv-av;
+  });
+  const valid=sorted.filter(r=>!r.error);
+  const totNet  =valid.reduce((s,r)=>s+(r.net_pnl||0),0);
+  const totGross=valid.reduce((s,r)=>s+(r.gross_pnl||0),0);
+  const totChg  =valid.reduce((s,r)=>s+(r.charges||0),0);
+  const totTrd  =valid.reduce((s,r)=>s+(r.trades||0),0);
+  const avgRet  =valid.length?valid.reduce((s,r)=>s+(r.return_pct||0),0)/valid.length:0;
+  const avgWR   =valid.length?valid.reduce((s,r)=>s+(r.win_rate||0),0)/valid.length:0;
+  $('mRet').textContent=fPct(avgRet);    $('mRet').className='met-v '+cls(avgRet);
+  $('mNet').textContent=fmt(totNet);     $('mNet').className='met-v '+cls(totNet);
+  $('mGross').textContent=fmt(totGross); $('mGross').className='met-v neu';
+  $('mChg').textContent=fmt(totChg);     $('mChg').className='met-v neg';
+  $('mTrd').textContent=totTrd;          $('mTrd').className='met-v neu';
+  $('mWR').textContent=avgWR.toFixed(1)+'%'; $('mWR').className='met-v '+(avgWR>=50?'pos':'neg');
+  $('mRetFill').style.width=Math.min(100,Math.abs(avgRet)*4)+'%';
+  $('mNetFill').style.background=totNet>=0?'var(--green)':'var(--red)';
+  $('mNetFill').style.width=Math.min(100,Math.abs(totNet)/1000)+'%';
+  $('mWRFill').style.width=avgWR+'%';
+  $('tagSym').textContent=valid.length+' symbols';
+  $('resBody').innerHTML=sorted.map((r,i)=>{
+    if(r.error)return`<tr class="err"><td class="neu">${i+1}</td><td class="sym">${r.symbol}</td><td colspan="9" class="neu" style="font-size:11px">${r.error}</td></tr>`;
+    const rb=i===0?`<span class="rank-badge rk1">1</span>`:i===1?`<span class="rank-badge rk2">2</span>`:i===2?`<span class="rank-badge rk3">3</span>`:`<span style="color:var(--muted);font-size:11px">${i+1}</span>`;
+    const ac=r.applied_config||{};
+    const tierNum=r.tier;
+    const tierCls=tierNum===1?'t1':tierNum===2?'t2':r.trades===0?'skip':'';
+    const tierLabel=tierNum===1?'T1':tierNum===2?'T2':tierNum===3?'T3 skip':'—';
+    const cfgStr=ac.risk!==undefined
+      ?`<span class="cfg-badge ${tierCls}">${tierLabel}</span><span class="cfg-badge">risk=${(ac.risk*100).toFixed(1)}%</span><span class="cfg-badge">rr=${ac.rr}</span><span class="cfg-badge">cd=${ac.cooldown}</span>`
+      :`<span class="cfg-badge">UI preset</span>`;
+    return`<tr style="cursor:pointer" title="Click to view trades" onclick="openTradeLog('${r.symbol}')">
+      <td>${rb}</td>
+      <td class="sym">${r.symbol}</td>
+      <td>${fmt(r.balance)}</td>
+      <td class="${cls(r.return_pct)}">${fPct(r.return_pct)}</td>
+      <td class="${cls(r.net_pnl)}">${fmt(r.net_pnl)}</td>
+      <td>${fmt(r.gross_pnl)}</td>
+      <td class="neg">${fmt(r.charges)}</td>
+      <td>${r.trades}</td>
+      <td class="${r.win_rate>=50?'pos':'neg'}">${r.win_rate}%</td>
+      <td style="font-size:10px;white-space:nowrap">${cfgStr}</td>
+      <td><a href="/trade_log?symbol=${r.symbol}" style="color:var(--red);font-size:11px;text-decoration:none;font-weight:600">📋</a></td>
+    </tr>`;
+  }).join('');
+}
+
+function sortBy(key){
+  sortKey===key?sortAsc=!sortAsc:(sortKey=key,sortAsc=false);
+  document.querySelectorAll('.rt thead th').forEach(t=>t.classList.remove('sorted'));
+  event.target.classList.add('sorted');
+  renderTable(activeConf);
+}
+
+/* ── RECLASSIFY ── */
+function runReclassify(){
+  const syms = [...selectedSyms];
+  const statusEl = $('reclassifyStatus');
+  if(!syms.length){ toast('⚠️ Select symbols first'); return; }
+  statusEl.style.display = '';
+  statusEl.textContent = `🔄 Re-classifying ${syms.length} symbols…`;
+  fetch('/reclassify_all',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbols:syms})
+  }).then(r=>r.json()).then(d=>{
+    if(d.error){ statusEl.textContent='❌ '+d.error; return; }
+    toast('✅ Reclassification started');
+    statusEl.textContent = `⏳ Classifying ${syms.length} symbols…`;
+    const poll = setInterval(()=>{
+      fetch('/classify_status').then(r=>r.json()).then(s=>{
+        const done = Object.keys(s.results||{}).length;
+        statusEl.textContent = s.done
+          ? `✅ Done — ${done} symbols classified. Run backtest to see updated tiers.`
+          : `⏳ Classifying… ${done}/${syms.length}`;
+        if(s.done){ clearInterval(poll); toast('✅ Tier map updated in DB'); }
+      });
+    }, 1500);
+  }).catch(e=>{ statusEl.textContent='❌ '+e; });
+}
+
+/* ── SLOTS ── */
+function loadSlot(name){
+  fetch('/load_slot/'+encodeURIComponent(name)).then(r=>r.json()).then(s=>{
+    if(s.status==='error'){toast('❌ '+s.message);return;}
+    $('fRisk').value=s.risk_per_trade; $('fRR').value=s.rr_target;
+    $('fCD').value=s.cooldown; $('fMPD').value=s.min_price_distance;
+    if(allResults[name]) renderTable(name);
+    toast('✅ Loaded '+name);
+  });
+}
+
+function lockCurrent(){
+  const cfg={...getCfg(),name:'Custom'};
+  fetch('/lock_config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)})
+  .then(r=>r.json()).then(()=>{ $('lockedPill').textContent='🔒 Custom'; toast('✅ Locked for live'); });
+}
+
+function lockSlot(name){
+  fetch('/load_slot/'+encodeURIComponent(name)).then(r=>r.json()).then(s=>{
+    if(s.status==='error'){toast('❌ '+s.message);return;}
+    return fetch('/lock_config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});
+  }).then(r=>r&&r.json()).then(()=>{ $('lockedPill').textContent='🔒 '+name; toast('✅ '+name+' locked for live'); });
+}
+
+/* ── SAVE MODAL ── */
+function openSaveModal(){ $('saveModal').classList.add('open'); }
+function closeSave(){ $('saveModal').classList.remove('open'); }
+function doSave(){
+  const slot=$('slotSel').value, cfg=getCfg();
+  fetch('/save_slot',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({slot,...cfg})}).then(r=>r.json())
+  .then(()=>{ closeSave(); toast('✅ Saved to '+slot); setTimeout(()=>location.reload(),800); });
+}
+
+/* ── TRADE LOG DRAWER ── */
+function openTradeLog(symbol){
+  const rows = allResults[activeConf]||[];
+  const row  = rows.find(r=>r.symbol===symbol);
+  if(!row){ toast('Run backtest first to see trades'); return; }
+  const trades = row.trade_log||[];
+  $('tlSym').textContent = symbol;
+  $('tlConfig').textContent = activeConf;
+  const wins = trades.filter(t=>t.net_pnl>0).length;
+  const net  = trades.reduce((s,t)=>s+(t.net_pnl||0),0);
+  const chg  = trades.reduce((s,t)=>s+(t.charges||0),0);
+  $('tlTotal').textContent = trades.length;
+  $('tlWins').textContent  = wins;
+  $('tlLoss').textContent  = trades.length-wins;
+  $('tlWR').textContent    = trades.length?(wins/trades.length*100).toFixed(1)+'%':'0%';
+  $('tlNet').textContent   = (net>=0?'+':'')+Math.round(net);
+  $('tlNet').className     = 'tl-sv '+(net>=0?'pos':'neg');
+  $('tlChg').textContent   = '₹'+Math.round(chg);
+  $('tlFooter').textContent = `${trades.length} trades · ${activeConf} · in-memory`;
+  if(trades.length===0){
+    $('tlEmpty').style.display='block'; $('tlTable').style.display='none';
+    $('tlEmpty').textContent = `No trades for ${symbol} in ${activeConf}`;
+  } else {
+    $('tlEmpty').style.display='none'; $('tlTable').style.display='table';
+    $('tlBody').innerHTML = trades.map((t,i)=>{
+      const isBuy=t.direction==='BUY';
+      const nc=t.net_pnl>=0?'pos':'neg'; const gc=t.gross_pnl>=0?'pos':'neg';
+      return`<tr>
+        <td class="neu">${i+1}</td>
+        <td class="${isBuy?'dir-buy':'dir-sell'}">${t.direction}</td>
+        <td class="neu">${String(t.entry_time||'').slice(0,16)}</td>
+        <td class="neu">${String(t.exit_time||'').slice(0,16)}</td>
+        <td>${t.entry_price}</td><td>${t.exit_price}</td><td>${t.qty}</td>
+        <td class="${gc}">${t.gross_pnl>=0?'+':''}${Math.round(t.gross_pnl)}</td>
+        <td class="neg">₹${Math.round(t.charges)}</td>
+        <td class="${nc}">${t.net_pnl>=0?'+':''}${Math.round(t.net_pnl)}</td>
+        <td class="neu" style="font-size:11px">${t.reason||''}</td>
+      </tr>`;
+    }).join('');
+  }
+  $('tlOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeTL(e){ if(e.target===$('tlOverlay')) closeTLBtn(); }
+function closeTLBtn(){ $('tlOverlay').classList.remove('open'); document.body.style.overflow=''; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeTLBtn(); });
+
+/* ── SOCKET PROGRESS ── */
+const socket = typeof io!=='undefined' ? io() : null;
+let _progVisible = false;
+if(socket) socket.on('bt_progress', data=>updateProgPanel(data));
+
+let _pollTimer = null;
+function startPollProgress(){
+  if(socket && socket.connected) return;
+  _pollTimer = setInterval(()=>{
+    fetch('/bt_progress').then(r=>r.json()).then(d=>{
+      updateProgPanel(d);
+      if(!d.running) clearInterval(_pollTimer);
+    }).catch(()=>{});
+  }, 800);
+}
+
+function updateProgPanel(data){
+  if(!data||data.total===0) return;
+  const panel=$('progPanel');
+  if(!_progVisible){ panel.classList.add('show'); _progVisible=true; }
+  const done=data.done||0, total=data.total||1;
+  const pct=Math.round(done/total*100);
+  const syms=data.symbols||{};
+  $('progPct').textContent=pct+'%';
+  $('progBar').style.width=pct+'%';
+  $('psDone').textContent=done;
+  $('psTotal').textContent=total;
+  $('psCfg').textContent=data.config||'—';
+  $('progTitle').textContent=data.running?'Running: '+data.config+'…':'✅ '+data.config+' done';
+  $('progSpin').style.display=data.running?'block':'none';
+  const all=Object.entries(syms);
+  const okList=all.filter(([,v])=>v.status==='ok').sort((a,b)=>(b[1].return_pct||0)-(a[1].return_pct||0));
+  const errList=all.filter(([,v])=>v.status==='error');
+  const pending=all.filter(([,v])=>v.status==='pending');
+  $('progSymWrap').innerHTML=[...pending,...okList,...errList].map(([sym,info])=>{
+    const s=info.status;
+    const rc=s==='ok'?(info.return_pct>=0?'pos':'neg'):'neu';
+    const rv=s==='ok'?(info.return_pct>=0?'+':'')+Number(info.return_pct).toFixed(2)+'%':s==='error'?'ERR':'…';
+    const rowClass=s==='ok'?'done-ok':s==='error'?'done-err':'pending';
+    const dotClass=s==='ok'?'ok':s==='error'?'err':'pending';
+    const tradeInfo=s==='ok'?`<span style="font-size:10px;color:var(--muted)">${info.trades||0}T ${info.win_rate||0}%WR</span>`:'';
+    return`<div class="prog-sym-row ${rowClass}"><div class="ps-dot ${dotClass}"></div><span class="ps-sym">${sym}</span>${tradeInfo}<span class="ps-ret ${rc}">${rv}</span></div>`;
+  }).join('');
+  $('progFooter').textContent=data.running?`${done}/${total} done`:`✅ ${okList.length} ok · ${errList.length} failed · 100% complete`;
+}
+
+function closeProgPanel(){ $('progPanel').classList.remove('show'); _progVisible=false; }
+
+/* ── INIT ── */
+document.querySelectorAll('.sym-check:checked').forEach(cb=>{
+  cb.closest('.sym-item').classList.add('selected');
+});
+fetch('/locked_config').then(r=>r.json()).then(c=>{
+  if(c&&c.name) $('lockedPill').textContent='🔒 '+c.name;
+});
+
+// Restore last backtest results from server on page load
+fetch('/bt_progress').then(r=>r.json()).then(data=>{
+  if(!data||data.running||!data.symbols||data.done===0) return;
+  // Reconstruct allResults from bt_progress for table render
+  fetch('/api/bt_last_run').then(r=>r.json()).then(meta=>{
+    if(!meta||!meta.symbols) return;
+    const rows = Object.entries(meta.symbols).map(([sym,s])=>({
+      symbol:     sym,
+      balance:    s.balance||200000,
+      return_pct: s.return_pct||0,
+      net_pnl:    s.net_pnl||0,
+      gross_pnl:  s.gross||0,
+      charges:    s.charges||0,
+      trades:     s.trades||0,
+      win_rate:   s.win_rate||0,
+      tier:       s.tier,
+      trade_log:  [],
+    }));
+    allResults = {'Custom': rows};
+    fetchDone = true;
+    $('btnRun').disabled = false;
+    setStep(3);
+    renderTable('Custom');
+    setStatus('done', `✅ Last backtest restored — ${rows.filter(r=>r.trades>0).length} symbols with trades`);
+    toast('📊 Last backtest results restored');
+  }).catch(()=>{});
+}).catch(()=>{});
+
+updateSelCount();
+updateSymCount();
+setStep(1);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,15 @@
+flask>=3.0
+flask-socketio>=5.3
+python-dotenv>=1.0
+pandas>=2.0
+protobuf>=4.0
+websocket-client>=1.6
+requests>=2.31
+mplfinance>=0.12.9b7
+matplotlib>=3.7
+python-engineio>=4.8
+python-socketio>=5.10
+psycopg2-binary>=2.9
+python-dateutil>=2.8
+gunicorn>=21.2
+eventlet>=0.35

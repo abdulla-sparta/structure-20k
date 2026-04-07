@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+engine_state_*.json
+reports/
+*.log
+.DS_Store
+
+# SQLite DB files — Railway uses Postgres, local DB files are transient
+*.db
+state/
+
+# CSVs excluded from git — Railway volume or startup gap-fill handles them
+data/*.csv

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StructureEngine — Signals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+<style>
+:root{--bg:#f0f2f5;--surface:#fff;--border:#e2e6ea;--text:#1a1d23;--muted:#6b7280;--blue:#0f6fff;--green:#16a34a;--red:#dc2626;--amber:#d97706;--purple:#7c3aed;--surface2:#f8f9fb}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh;display:flex;flex-direction:column}
+.nav{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:14px;flex-shrink:0;position:sticky;top:0;z-index:100}
+.nav-logo{font-weight:600;font-size:14px;letter-spacing:.5px}
+.nav-badge{background:#fef3c7;color:#92400e;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:.5px}
+.nav-sep{width:1px;height:20px;background:var(--border)}
+.nav-tab{padding:6px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:500;font-size:13px;text-decoration:none;display:inline-flex;align-items:center}
+.nav-tab:hover{background:var(--bg);color:var(--text)}
+.nav-tab.active{background:#f0f4ff;color:var(--blue);font-weight:600}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#e2e6ea;transition:background .3s}
+.conn-dot.live{background:var(--green);box-shadow:0 0 6px rgba(22,163,74,.5)}
+.conn-label{font-size:11px;color:var(--muted);font-weight:500}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-bottom:1px solid var(--border)}
+.stat-cell{padding:10px 16px;border-right:1px solid var(--border);text-align:center}
+.stat-cell:last-child{border-right:none}
+.stat-label{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px}
+.stat-val{font-size:15px;font-weight:700;font-family:'DM Mono',monospace}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+.main{display:grid;grid-template-columns:1fr 280px;flex:1}
+.feed-panel{border-right:1px solid var(--border);display:flex;flex-direction:column}
+.panel-header{padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;position:sticky;top:48px;z-index:10}
+.panel-title{font-weight:600;font-size:13px}
+.panel-count{margin-left:auto;font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:2px 8px;border-radius:10px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#e2e6ea}
+.live-dot.on{background:var(--green);box-shadow:0 0 6px rgba(22,163,74,.5);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.feed-list{padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.sig-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;animation:slideIn .3s cubic-bezier(.16,1,.3,1);transition:box-shadow .2s}
+.sig-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.sig-card.is-new{border-color:var(--blue);border-width:2px}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.sig-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.sig-sym{font-weight:700;font-size:15px}
+.sig-side{font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:.5px}
+.sig-side.BUY{background:#dbeafe;color:#1d4ed8}
+.sig-side.SELL{background:#fee2e2;color:#b91c1c}
+.sig-tier{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px}
+.sig-tier.T1{background:#f5f0ff;color:var(--purple);border:1px solid #e9d5ff}
+.sig-tier.T2{background:#f0f4ff;color:var(--blue);border:1px solid #bfdbfe}
+.sig-bias{font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px}
+.sig-bias.BULLISH{background:#dcfce7;color:#15803d}
+.sig-bias.BEARISH{background:#fee2e2;color:#b91c1c}
+.sig-time{margin-left:auto;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+.new-badge{font-size:9px;font-weight:700;padding:1px 6px;background:#dbeafe;color:var(--blue);border-radius:3px;letter-spacing:.5px}
+.sig-body{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)}
+.sig-cell{padding:10px 14px;border-right:1px solid var(--border);text-align:center}
+.sig-cell:last-child{border-right:none}
+.sc-label{font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+.sc-val{font-size:14px;font-weight:700;font-family:'DM Mono',monospace}
+.sc-val.entry{color:var(--blue)}.sc-val.stop{color:var(--red)}.sc-val.target{color:var(--green)}.sc-val.qty{color:var(--text)}
+.sig-foot{display:flex;align-items:center;gap:12px;padding:7px 14px;background:var(--surface2);font-size:11px;color:var(--muted)}
+.sf-item span{color:var(--text);font-weight:600;font-family:'DM Mono',monospace}
+.rr-chip{margin-left:auto;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#f0f4ff;color:var(--blue);border:1px solid #bfdbfe}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;color:var(--muted);text-align:center;gap:10px}
+.empty-icon{font-size:48px;opacity:.3}
+.empty-title{font-size:15px;font-weight:600;color:var(--text)}
+.empty-sub{font-size:12px;max-width:280px;line-height:1.6}
+.side-panel{background:var(--surface);display:flex;flex-direction:column;overflow-y:auto}
+.side-section{border-bottom:1px solid var(--border);padding:12px 14px}
+.side-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.eng-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--surface2)}
+.eng-dot{width:7px;height:7px;border-radius:50%;background:#e2e6ea;flex-shrink:0}
+.eng-dot.running{background:var(--green);box-shadow:0 0 5px rgba(22,163,74,.5);animation:pulse 2s infinite}
+.eng-dot.replay{background:var(--amber);animation:pulse 1s infinite}
+.eng-label{font-size:11px;color:var(--muted)}
+.eng-label b{color:var(--text)}
+.btn-sound{width:100%;padding:7px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
+.btn-sound:hover{border-color:var(--blue);color:var(--blue)}
+.btn-sound.on{border-color:var(--green);background:#f0fdf4;color:var(--green)}
+.wi-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+.wi-row:last-child{border-bottom:none}
+.wi-sym{font-weight:600;flex:1}
+.wi-tier{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px}
+.wi-tier.T1{background:#f5f0ff;color:var(--purple)}
+.wi-tier.T2{background:#f0f4ff;color:var(--blue)}
+.wi-bias{font-size:10px;font-weight:700;width:60px;text-align:right}
+.wi-bias.BULLISH{color:var(--green)}.wi-bias.BEARISH{color:var(--red)}.wi-bias.NO{color:var(--muted)}
+.sum-row{display:grid;grid-template-columns:70px 36px 1fr 1fr 1fr;gap:4px;padding:5px 0;border-bottom:1px solid var(--border);font-size:10px;font-family:'DM Mono',monospace;align-items:center}
+.sum-row:last-child{border-bottom:none}
+.sum-hdr{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.5px;color:var(--muted);font-weight:600;text-transform:uppercase}
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1d23;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:999}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <span class="nav-logo">STRUCTUREENGINE</span>
+  <span class="nav-badge">LIVE PAPER</span>
+  <div class="nav-sep"></div>
+  <a class="nav-tab" href="/">📈 Backtest</a>
+  <a class="nav-tab" href="/live">⏱ Live</a>
+  <a class="nav-tab" href="/heatmap">🔥 Heatmap</a>
+  <a class="nav-tab active" href="/signals">📡 Signals</a>
+  <a class="nav-tab" href="/ob">📖 OB</a>
+  <div class="nav-right">
+    <div class="conn-dot" id="connDot"></div>
+    <span class="conn-label" id="connLabel">Connecting…</span>
+  </div>
+</nav>
+<div class="stats-bar">
+  <div class="stat-cell"><div class="stat-label">Signals Today</div><div class="stat-val" id="statTotal">0</div></div>
+  <div class="stat-cell"><div class="stat-label">BUY</div><div class="stat-val pos" id="statBuy">0</div></div>
+  <div class="stat-cell"><div class="stat-label">SELL</div><div class="stat-val neg" id="statSell">0</div></div>
+  <div class="stat-cell"><div class="stat-label">Avg RR</div><div class="stat-val" id="statRR" style="color:var(--blue)">—</div></div>
+  <div class="stat-cell"><div class="stat-label">Last Signal</div><div class="stat-val neu" id="statLast" style="font-size:12px">—</div></div>
+</div>
+<div class="main">
+  <div class="feed-panel">
+    <div class="panel-header">
+      <div class="live-dot" id="liveDot"></div>
+      <div class="panel-title">Signal Feed</div>
+      <div class="panel-count" id="feedCount">0 signals</div>
+    </div>
+    <div class="feed-list" id="feedList">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📡</div>
+        <div class="empty-title">Waiting for signals</div>
+        <div class="empty-sub">Engine is watching 28 symbols. Signals appear here instantly when structure conditions are met.</div>
+      </div>
+    </div>
+  </div>
+  <div class="side-panel">
+    <div class="side-section">
+      <div class="side-title">Engine Status</div>
+      <div class="eng-row"><div class="eng-dot" id="engDot"></div><div class="eng-label" id="engLabel">Not running</div></div>
+      <div class="eng-row"><div class="eng-dot" id="wsDot"></div><div class="eng-label" id="wsLabel">WS disconnected</div></div>
+    </div>
+    <div class="side-section">
+      <div class="side-title">Alert Sound</div>
+      <button class="btn-sound" id="soundBtn" onclick="toggleSound()">🔇 Sound OFF — click to enable</button>
+    </div>
+    <div class="side-section" style="flex:1">
+      <div class="side-title">Watchlist T1 / T2</div>
+      <div id="watchlistEl"></div>
+    </div>
+    <div class="side-section">
+      <div class="side-title">Recent Signals</div>
+      <div class="sum-row sum-hdr"><span>SYM</span><span>SIDE</span><span>ENTRY</span><span>SL</span><span>TGT</span></div>
+      <div id="summaryEl"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const signals=[];let soundOn=false;
+const T1=['TRENT','CUMMINSIND','M&M'];
+const T2=['OFSS','HCLTECH','PERSISTENT','MPHASIS','BOSCHLTD','RELIANCE'];
+const biasCache={};
+
+function playBeep(side){
+  if(!soundOn)return;
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [[side==='BUY'?880:440,0,.35],[side==='BUY'?1100:330,.18,.45]].forEach(([freq,delay,end])=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=freq;o.type='sine';
+      g.gain.setValueAtTime(.25,ctx.currentTime+delay);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+end);
+      o.start(ctx.currentTime+delay);o.stop(ctx.currentTime+end);
+    });
+  }catch(e){}
+}
+
+function toggleSound(){
+  soundOn=!soundOn;
+  const b=document.getElementById('soundBtn');
+  b.textContent=soundOn?'🔊 Sound ON':'🔇 Sound OFF — click to enable';
+  b.className='btn-sound'+(soundOn?' on':'');
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+function makeCard(sig,isNew){
+  const tier=T1.includes(sig.symbol)?'T1':T2.includes(sig.symbol)?'T2':'';
+  const rr=sig.rr||0;
+  const risk=Math.abs(Number(sig.entry)-Number(sig.stop)).toFixed(2);
+  const rwd=Math.abs(Number(sig.target)-Number(sig.entry)).toFixed(2);
+  const d=document.createElement('div');
+  d.className='sig-card'+(isNew?' is-new':'');
+  if(isNew)setTimeout(()=>d.classList.remove('is-new'),5000);
+  d.innerHTML=`
+    <div class="sig-head">
+      <span class="sig-sym">${sig.symbol}</span>
+      <span class="sig-side ${sig.side}">${sig.side}</span>
+      ${tier?`<span class="sig-tier ${tier}">${tier}</span>`:''}
+      ${sig.bias?`<span class="sig-bias ${sig.bias}">${sig.bias==='BULLISH'?'▲ BULL':'▼ BEAR'}</span>`:''}
+      ${isNew?'<span class="new-badge">NEW</span>':''}
+      <span class="sig-time">${sig.time||''}</span>
+    </div>
+    <div class="sig-body">
+      <div class="sig-cell"><div class="sc-label">Entry</div><div class="sc-val entry">₹${Number(sig.entry).toFixed(2)}</div></div>
+      <div class="sig-cell"><div class="sc-label">Stop Loss</div><div class="sc-val stop">₹${Number(sig.stop).toFixed(2)}</div></div>
+      <div class="sig-cell"><div class="sc-label">Target</div><div class="sc-val target">₹${Number(sig.target).toFixed(2)}</div></div>
+      <div class="sig-cell"><div class="sc-label">Qty</div><div class="sc-val qty">${sig.qty||'—'}</div></div>
+    </div>
+    <div class="sig-foot">
+      <div class="sf-item">Risk <span>₹${risk}/unit</span></div>
+      <div class="sf-item">Reward <span>₹${rwd}/unit</span></div>
+      <div class="rr-chip">RR ${rr}:1</div>
+    </div>`;
+  return d;
+}
+
+function addSignal(sig,isNew){
+  // Avoid duplicates (e.g. from both fetch and signal_history)
+  if(signals.find(s=>s.symbol===sig.symbol&&s.time===sig.time))return;
+  signals.unshift(sig);
+  document.getElementById('emptyState')?.remove();
+  document.getElementById('feedList').prepend(makeCard(sig,isNew));
+  updateStats();updateSummary();
+  if(isNew){
+    playBeep(sig.side);
+    showToast(`📡 ${sig.symbol} ${sig.side} @ ₹${Number(sig.entry).toFixed(2)}`);
+    let n=6;const orig=document.title;
+    const iv=setInterval(()=>{
+      document.title=--n%2===0?`🚨 ${sig.symbol} ${sig.side}!`:orig;
+      if(n<=0){clearInterval(iv);document.title=orig;}
+    },600);
+  }
+}
+
+function updateStats(){
+  document.getElementById('statTotal').textContent=signals.length;
+  document.getElementById('statBuy').textContent=signals.filter(s=>s.side==='BUY').length;
+  document.getElementById('statSell').textContent=signals.filter(s=>s.side==='SELL').length;
+  const rrs=signals.map(s=>s.rr).filter(r=>r>0);
+  document.getElementById('statRR').textContent=rrs.length?(rrs.reduce((a,b)=>a+b,0)/rrs.length).toFixed(1):'—';
+  document.getElementById('feedCount').textContent=`${signals.length} signal${signals.length!==1?'s':''}`;
+  if(signals.length){
+    const l=signals[0];
+    document.getElementById('statLast').textContent=`${l.symbol} ${l.side} ${l.time||''}`;
+    document.getElementById('statLast').className='stat-val '+(l.side==='BUY'?'pos':'neg');
+  }
+}
+
+function updateSummary(){
+  const el=document.getElementById('summaryEl');el.innerHTML='';
+  signals.slice(0,6).forEach(s=>{
+    const r=document.createElement('div');r.className='sum-row';
+    r.innerHTML=`<span style="font-weight:600;font-family:'DM Sans',sans-serif">${s.symbol}</span><span style="color:${s.side==='BUY'?'var(--blue)':'var(--red)'};font-weight:700">${s.side}</span><span>₹${Number(s.entry).toFixed(0)}</span><span style="color:var(--red)">₹${Number(s.stop).toFixed(0)}</span><span style="color:var(--green)">₹${Number(s.target).toFixed(0)}</span>`;
+    el.appendChild(r);
+  });
+}
+
+function renderWatchlist(){
+  const el=document.getElementById('watchlistEl');el.innerHTML='';
+  [...T1,...T2].forEach(sym=>{
+    const tier=T1.includes(sym)?'T1':'T2';
+    const bias=biasCache[sym]||'NO';
+    const r=document.createElement('div');r.className='wi-row';r.id='wi-'+sym;
+    r.innerHTML=`<span class="wi-sym">${sym}</span><span class="wi-tier ${tier}">${tier}</span><span class="wi-bias ${bias}">${bias==='NO'?'—':bias==='BULLISH'?'▲ BULL':'▼ BEAR'}</span>`;
+    el.appendChild(r);
+  });
+}
+
+function setEngine(state){
+  const d=document.getElementById('engDot'),l=document.getElementById('engLabel'),ld=document.getElementById('liveDot');
+  if(state==='running'){d.className='eng-dot running';l.innerHTML='<b>Engine running</b>';ld.className='live-dot on';}
+  else if(state==='replay'){d.className='eng-dot replay';l.innerHTML='Replaying history…';ld.className='live-dot';}
+  else{d.className='eng-dot';l.innerHTML='Engine stopped';ld.className='live-dot';}
+}
+function setWS(ok){
+  const d=document.getElementById('wsDot'),l=document.getElementById('wsLabel');
+  const cd=document.getElementById('connDot'),cl=document.getElementById('connLabel');
+  if(ok){d.className='eng-dot running';l.innerHTML='<b>WS connected</b> — live ticks';cd.className='conn-dot live';cl.textContent='Live';}
+  else{d.className='eng-dot';l.innerHTML='WS disconnected';cd.className='conn-dot';cl.textContent='Offline';}
+}
+
+// Load cached signals on page load via REST API
+fetch('/api/signals').then(r=>r.json()).then(data=>{
+  if(data?.length)[...data].reverse().forEach(s=>addSignal(s,false));
+}).catch(()=>{});
+
+const socket=io();
+socket.on('connect',()=>setWS(true));
+socket.on('disconnect',()=>setWS(false));
+socket.on('signal_fired',sig=>addSignal(sig,true));
+// Replay cached signals on socket reconnect (covers browser refresh mid-session)
+socket.on('signal_history',sigs=>[...sigs].reverse().forEach(s=>addSignal(s,false)));
+socket.on('engine_started',data=>{
+  setEngine('running');
+  (data.instruments||[]).forEach(i=>{biasCache[i.symbol]=i.bias;});
+  renderWatchlist();
+});
+socket.on('live_update',data=>{
+  if(!data.instruments)return;
+  setEngine('running');
+  data.instruments.forEach(i=>{
+    biasCache[i.symbol]=i.bias||'NO';
+    const row=document.getElementById('wi-'+i.symbol);if(!row)return;
+    const b=row.querySelector('.wi-bias');if(!b)return;
+    b.className='wi-bias '+(i.bias||'NO');
+    b.textContent=!i.bias||i.bias==='NO'?'—':i.bias==='BULLISH'?'▲ BULL':'▼ BEAR';
+  });
+});
+socket.on('engine_stopped',()=>setEngine('stopped'));
+renderWatchlist();setEngine('stopped');setWS(false);
+</script>
+</body>
+</html>

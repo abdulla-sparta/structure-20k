@@ -1,0 +1,21 @@
+[build]
+builder = "nixpacks"
+[deploy]
+startCommand = "gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+[[mounts]]
+mountPath = "/app/csvdata"
+# ── Cron jobs (all times UTC — IST = UTC+5:30) ───────────────────────────────
+[[cronJobs]]
+# Auto-start engine at 08:00 IST = 02:30 UTC, Mon–Fri
+schedule = "30 2 * * 1-5"
+command  = "curl -s -X POST http://localhost:$PORT/cron/start"
+[[cronJobs]]
+# Auto-stop engine at 15:31 IST = 10:01 UTC, Mon–Fri
+schedule = "1 10 * * 1-5"
+command  = "curl -s -X POST http://localhost:$PORT/cron/stop"
+[[cronJobs]]
+# EOD CSV update at 17:02 IST = 11:32 UTC (backup — eod_updater.py fires at 16:31 IST internally)
+schedule = "32 11 * * 1-5"
+command  = "curl -s -X POST http://localhost:$PORT/eod_update"

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StructureEngine · Live View</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #f0f2f5;
+      --surface: #ffffff;
+      --border:  #e2e6ea;
+      --text:    #1a1d23;
+      --muted:   #6b7280;
+      --green:   #16a34a;
+      --red:     #dc2626;
+      --amber:   #d97706;
+      --blue:    #0f6fff;
+      --surface2:#f8f9fb;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .header-title { font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .badge-paper     { background: #fef3c7; color: #92400e; }
+    .badge-readonly  { background: #f0f4ff; color: var(--blue); border: 1px solid #bfdbfe; }
+    .badge-connected { background: #dcfce7; color: var(--green); }
+    .badge-disconnected { background: #fee2e2; color: var(--red); }
+
+    .header-spacer { flex: 1; }
+
+    .pnl-summary { display: flex; gap: 16px; align-items: center; }
+    .pnl-item { text-align: right; }
+    .pnl-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .pnl-value { font-size: 14px; font-weight: 700; font-family: 'DM Mono', monospace; }
+    .pnl-value.pos { color: var(--green); }
+    .pnl-value.neg { color: var(--red); }
+    .pnl-value.neu { color: var(--text); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 16px;
+      display: flex;
+      gap: 20px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .status-bar span { display: flex; align-items: center; gap: 4px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot-green  { background: var(--green); box-shadow: 0 0 4px rgba(22,163,74,.5); }
+    .dot-red    { background: var(--red); }
+    .dot-yellow { background: var(--amber); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 14px;
+      padding: 16px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow 0.2s;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .card.has-position  { border-left: 3px solid var(--blue); }
+    .card.profit-pos    { border-left: 3px solid var(--green); }
+    .card.loss-pos      { border-left: 3px solid var(--red); }
+    .card.no-position   { border-left: 3px solid transparent; }
+
+    /* ── Card head ── */
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .symbol { font-weight: 700; font-size: 14px; letter-spacing: 0.3px; }
+
+    .bias-badge {
+      font-size: 10px; font-weight: 800;
+      padding: 2px 7px; border-radius: 4px;
+      letter-spacing: 0.4px;
+    }
+    .bias-bull { background: #dcfce7; color: #15803d; }
+    .bias-bear { background: #fee2e2; color: #b91c1c; }
+    .bias-none { background: #f1f5f9; color: #94a3b8; }
+
+    .ltp-block { text-align: right; }
+    .ltp-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 15px; font-weight: 700;
+    }
+    .ltp-up   { color: var(--green); }
+    .ltp-down { color: var(--red); }
+    .ltp-flat { color: var(--text); }
+    .change-pct {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 6px; border-radius: 5px;
+      font-family: 'DM Mono', monospace;
+    }
+    .chg-pos { background: #dcfce7; color: var(--green); }
+    .chg-neg { background: #fee2e2; color: var(--red); }
+
+    /* ── PnL row ── */
+    .pnl-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .pnl-cell { padding: 10px 14px; text-align: center; border-right: 1px solid var(--border); }
+    .pnl-cell:last-child { border-right: none; }
+    .pnl-cell-label { font-size: 10px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px; }
+    .pnl-cell-val { font-size: 14px; font-weight: 700; font-family: 'DM Mono', monospace; }
+    .green { color: var(--green); }
+    .red   { color: var(--red); }
+    .dim   { color: var(--muted); }
+
+    /* ── Position box ── */
+    .card-pos {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+    }
+    .no-pos { color: var(--muted); font-size: 11px; font-style: italic; }
+    .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      width: 100%;
+    }
+    .pos-item .pl { font-size: 10px; color: var(--muted); font-weight: 500; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .pos-item .pv { font-size: 12px; font-weight: 600; font-family: 'DM Mono', monospace; }
+    .side-buy  { color: var(--blue); }
+    .side-sell { color: var(--red); }
+
+    /* ── Kill switch bar ── */
+    .ks-bar-wrap {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ks-label { color: var(--muted); white-space: nowrap; }
+    .ks-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .ks-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+    /* ── Waiting ── */
+    .waiting {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: 12px;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Flash ── */
+    @keyframes flash-green { 0%{background:#dcfce7} 100%{background:var(--surface)} }
+    @keyframes flash-red   { 0%{background:#fee2e2} 100%{background:var(--surface)} }
+    .flash-g { animation: flash-green 0.4s ease-out; }
+    .flash-r { animation: flash-red   0.4s ease-out; }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 12px;
+      font-size: 10px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 480px) {
+      .grid { grid-template-columns: 1fr; }
+      .pnl-summary { gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-title">STRUCTUREENGINE</span>
+  <span class="badge badge-paper">LIVE PAPER</span>
+  <span class="badge badge-readonly">READ ONLY</span>
+  <span class="badge" id="conn-badge">⚪ Connecting…</span>
+  <div class="header-spacer"></div>
+  <div class="pnl-summary">
+    <div class="pnl-item">
+      <div class="pnl-label">Net PnL</div>
+      <div class="pnl-value neu" id="hdr-net">—</div>
+    </div>
+    <div class="pnl-item">
+      <div class="pnl-label">Unrealised</div>
+      <div class="pnl-value neu" id="hdr-unreal">—</div>
+    </div>
+    <div class="pnl-item">
+      <div class="pnl-label">Balance</div>
+      <div class="pnl-value neu" id="hdr-balance">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span><span class="dot" id="ws-dot"></span><span id="ws-label">Disconnected</span></span>
+  <span>Symbols: <b id="sym-count">—</b></span>
+  <span>Positions: <b id="pos-count">0</b></span>
+  <span>Updated: <b id="last-update">—</b></span>
+</div>
+
+<div id="waiting" class="waiting">
+  <div class="spinner"></div>
+  <div>Waiting for engine data…</div>
+</div>
+<div id="grid" class="grid" style="display:none"></div>
+
+<div class="footer">StructureEngine · Read-Only Live View · Auto-refreshing</div>
+
+<script>
+  const socket = io({ transports: ["websocket", "polling"] });
+  let _instruments = [];
+  let _connected   = false;
+
+  function fmt(v) {
+    if (v == null) return "—";
+    const n = parseFloat(v);
+    if (isNaN(n)) return "—";
+    const abs = Math.abs(n).toLocaleString("en-IN", {maximumFractionDigits: 0});
+    return (n >= 0 ? "+" : "-") + "₹" + abs;
+  }
+
+  function fmtPrice(v) {
+    if (v == null) return "—";
+    return "₹" + parseFloat(v).toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function colorClass(v) {
+    const n = parseFloat(v);
+    if (isNaN(n) || n === 0) return "dim";
+    return n > 0 ? "green" : "red";
+  }
+
+  function hdrClass(v) {
+    const n = parseFloat(v);
+    if (isNaN(n) || n === 0) return "neu";
+    return n > 0 ? "pos" : "neg";
+  }
+
+  function timeNow() {
+    return new Date().toLocaleTimeString("en-IN", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  }
+
+  function setConnBadge(connected) {
+    const b   = document.getElementById("conn-badge");
+    const dot = document.getElementById("ws-dot");
+    const lbl = document.getElementById("ws-label");
+    if (connected) {
+      b.className = "badge badge-connected";
+      b.textContent = "🟢 Connected";
+      dot.className = "dot dot-green";
+      lbl.textContent = "WS Connected";
+    } else {
+      b.className = "badge badge-disconnected";
+      b.textContent = "🔴 Disconnected";
+      dot.className = "dot dot-red";
+      lbl.textContent = "Disconnected";
+    }
+  }
+
+  function updateHeaderPnL(instruments, portfolio) {
+    let totalNet = 0, totalUnreal = 0;
+    for (const inst of instruments) {
+      totalNet    += (inst.realised_pnl || 0);
+      totalUnreal += (inst.unrealised_pnl || 0);
+    }
+    const syms = instruments.reduce((s,i) => s + (i.balance||0), 0);
+
+    document.getElementById("hdr-net").textContent   = fmt(totalNet);
+    document.getElementById("hdr-net").className     = "pnl-value " + hdrClass(totalNet);
+    document.getElementById("hdr-unreal").textContent = fmt(totalUnreal);
+    document.getElementById("hdr-unreal").className  = "pnl-value " + hdrClass(totalUnreal);
+    document.getElementById("hdr-balance").textContent = syms ? "₹" + Math.round(syms/1000) + "k" : "—";
+    document.getElementById("hdr-balance").className = "pnl-value neu";
+
+    document.getElementById("sym-count").textContent  = instruments.length;
+    document.getElementById("pos-count").textContent  = instruments.filter(i => i.position).length;
+    document.getElementById("last-update").textContent = timeNow();
+  }
+
+  function positionHtml(pos) {
+    if (!pos) return `<span class="no-pos">No open position</span>`;
+    const side = (pos.side || "").toUpperCase();
+    return `
+      <div class="pos-grid">
+        <div class="pos-item"><div class="pl">Side</div><div class="pv ${side==='BUY'?'side-buy':'side-sell'}">${side}</div></div>
+        <div class="pos-item"><div class="pl">Entry</div><div class="pv">${fmtPrice(pos.entry_price)}</div></div>
+        <div class="pos-item"><div class="pl">Qty</div><div class="pv">${pos.qty||0}</div></div>
+        <div class="pos-item"><div class="pl">SL</div><div class="pv red">${fmtPrice(pos.stop)}</div></div>
+        <div class="pos-item"><div class="pl">Target</div><div class="pv green">${fmtPrice(pos.target)}</div></div>
+      </div>`;
+  }
+
+  function ksBarHtml(inst) {
+    const ks   = inst.kill_switch || {};
+    const peak = ks.peak || inst.balance || 200000;
+    const cur  = inst.balance || peak;
+    const pct  = Math.min(100, Math.max(0, (cur / peak) * 100));
+    const color = pct > 95 ? '#16a34a' : pct > 90 ? '#d97706' : '#dc2626';
+    const label = ks.triggered
+      ? '🔴 Kill switch fired'
+      : `🟢 Peak ₹${Math.round(peak/1000)}k · Threshold 90%`;
+    return `
+      <div class="ks-bar-wrap">
+        <span class="ks-label">${label}</span>
+        <div class="ks-bar-bg">
+          <div class="ks-bar-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+      </div>`;
+  }
+
+  function renderCard(inst) {
+    const sym      = inst.symbol || "?";
+    const bias     = (inst.bias || "").toUpperCase();
+    const ltp      = inst.ltp;
+    const change   = inst.change || 0;
+    const chgPct   = inst.change_pct || 0;
+    const realised  = inst.realised_pnl || 0;
+    const unrealised = inst.unrealised_pnl || 0;
+    const net      = realised + unrealised;
+    const pos      = inst.position;
+    const hasPos   = !!pos;
+
+    const ltpClass  = change > 0 ? "ltp-up" : change < 0 ? "ltp-down" : "ltp-flat";
+    const biasClass = bias === "BULLISH" ? "bias-bull" : bias === "BEARISH" ? "bias-bear" : "bias-none";
+    const biasLabel = bias === "BULLISH" ? "▲ BULL" : bias === "BEARISH" ? "▼ BEAR" : "—";
+    const chgSign   = chgPct >= 0 ? "+" : "";
+    const chgCls    = chgPct >= 0 ? "chg-pos" : "chg-neg";
+
+    // Card border class based on position + profitability
+    let cardCls = "card ";
+    if (hasPos) {
+      cardCls += unrealised > 0 ? "profit-pos" : "loss-pos";
+    } else {
+      cardCls += "no-position";
+    }
+
+    return `
+      <div class="${cardCls}" id="card-${sym}">
+        <div class="card-head">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+              <span class="symbol">${sym}</span>
+              <span class="bias-badge ${biasClass}">${biasLabel}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="ltp-val ${ltpClass}">${ltp ? fmtPrice(ltp) : "—"}</span>
+              <span class="change-pct ${chgCls}">${chgSign}${chgPct.toFixed(2)}%</span>
+              <span style="font-size:11px;color:${change>=0?'var(--green)':'var(--red)'};font-weight:600">${change>=0?'+':''}${Number(change||0).toFixed(2)}</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="dot ${hasPos ? 'dot-green' : 'dot-yellow'}" style="animation:${hasPos?'pulse 1.5s infinite':'none'}"></div>
+            <span style="font-size:11px;color:var(--muted);font-weight:500">${hasPos ? 'In Position' : 'Watching'}</span>
+          </div>
+        </div>
+        <div class="pnl-row">
+          <div class="pnl-cell">
+            <div class="pnl-cell-label">Realised</div>
+            <div class="pnl-cell-val ${colorClass(realised)}">${fmt(realised)}</div>
+          </div>
+          <div class="pnl-cell">
+            <div class="pnl-cell-label">Unrealised</div>
+            <div class="pnl-cell-val ${colorClass(unrealised)}">${fmt(unrealised)}</div>
+          </div>
+          <div class="pnl-cell">
+            <div class="pnl-cell-label">Net</div>
+            <div class="pnl-cell-val ${colorClass(net)}">${fmt(net)}</div>
+          </div>
+        </div>
+        <div class="card-pos">${positionHtml(pos)}</div>
+        ${ksBarHtml(inst)}
+      </div>`;
+  }
+
+  function renderGrid(instruments) {
+    const grid = document.getElementById("grid");
+
+    // Sort: profitable positions → losing positions → watching (by |net pnl|)
+    const sorted = [...instruments].sort((a, b) => {
+      const aPos = !!a.position, bPos = !!b.position;
+      const aUnreal = a.unrealised_pnl || 0, bUnreal = b.unrealised_pnl || 0;
+      const aNet = Math.abs((a.realised_pnl||0) + aUnreal);
+      const bNet = Math.abs((b.realised_pnl||0) + bUnreal);
+
+      const aG = aPos && aUnreal > 0 ? 0 : aPos ? 1 : 2;
+      const bG = bPos && bUnreal > 0 ? 0 : bPos ? 1 : 2;
+      if (aG !== bG) return aG - bG;
+      if (aG === 0) return bUnreal - aUnreal;   // highest profit first
+      if (aG === 1) return bUnreal - aUnreal;   // smallest loss first
+      return bNet - aNet;                        // watching: active first
+    });
+
+    const newHtml = sorted.map(renderCard).join("");
+    if (grid.innerHTML !== newHtml) {
+      grid.innerHTML = newHtml;
+    }
+  }
+
+  function flashCard(sym, direction) {
+    const card = document.getElementById("card-" + sym);
+    if (!card) return;
+    card.classList.remove("flash-g", "flash-r");
+    void card.offsetWidth;
+    card.classList.add(direction > 0 ? "flash-g" : "flash-r");
+  }
+
+  socket.on("connect", () => {
+    document.getElementById("ws-dot").className = "dot dot-yellow";
+    document.getElementById("ws-label").textContent = "Socket connected…";
+  });
+
+  socket.on("disconnect", () => setConnBadge(false));
+
+  socket.on("engine_started", (data) => {
+    if (!data || !data.instruments) return;
+    _instruments = data.instruments;
+    document.getElementById("waiting").style.display = "none";
+    document.getElementById("grid").style.display = "";
+    renderGrid(_instruments);
+    setConnBadge(true);
+  });
+
+  socket.on("live_update", (data) => {
+    if (!data) return;
+    _connected = data.connected;
+    if (data.instruments && data.instruments.length > 0) {
+      for (const inst of data.instruments) {
+        const old = _instruments.find(i => i.symbol === inst.symbol);
+        if (old && old.unrealised_pnl !== inst.unrealised_pnl) {
+          flashCard(inst.symbol, (inst.unrealised_pnl||0) - (old.unrealised_pnl||0));
+        }
+      }
+      _instruments = data.instruments;
+      document.getElementById("waiting").style.display = "none";
+      document.getElementById("grid").style.display = "";
+      renderGrid(_instruments);
+    }
+    updateHeaderPnL(_instruments, data.portfolio_equity || {});
+    setConnBadge(data.connected);
+    if (!data.connected && _instruments.length === 0) {
+      document.getElementById("waiting").style.display = "flex";
+      document.getElementById("grid").style.display = "none";
+    }
+  });
+</script>
+</body>
+</html>
