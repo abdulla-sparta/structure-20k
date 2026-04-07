@@ -56,7 +56,7 @@ CONFIG = {
     "backtest_mode": True,
 
     # ── ACCOUNT ───────────────────────────────────────────────────────────────
-    "starting_balance": 200000,   # ₹2L per symbol, independent
+    "starting_balance": 20000,   # ₹20k  per symbol, independent
 
     # ── QTY SIZING (risk-based) ────────────────────────────────────────────────
     # qty = int(balance × risk_per_trade / risk_points)
@@ -83,7 +83,7 @@ CONFIG = {
     "kill_switch_percent": 0.90,
 
     # ── PORTFOLIO DAILY LOSS LIMIT ────────────────────────────────────────────
-    "portfolio_daily_loss_limit": 50000,
+    "portfolio_daily_loss_limit": 5000,
 
     # ── ORDER BOOK EXECUTION ──────────────────────────────────────────────────
     # When enabled: signals go through liquidity filter + limit order fill
