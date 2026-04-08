@@ -6,11 +6,11 @@
 # ── TIER DEFINITIONS ──────────────────────────────────────────────────────────
 #
 #   Tier 1 (G/C > 2.0x) — Strong trending stock
-#     → risk=0.15%  cooldown=40 candles  min_stop=0.3%  max_stop=1.2%
+#     → risk=1.5%   cooldown=40 candles  min_stop=0.3%  max_stop=1.2%
 #     → "Let it run" — higher allocation, tighter cooldown
 #
 #   Tier 2 (G/C 1.0–2.0x) — Moderate, tradeable with discipline
-#     → risk=0.10%  cooldown=50 candles  min_stop=0.3%  max_stop=1.2%
+#     → risk=1.0%   cooldown=50 candles  min_stop=0.3%  max_stop=1.2%
 #     → Standard settings
 #
 #   Tier 3 (G/C < 1.0x) — Choppy / strategy doesn't suit
@@ -24,7 +24,7 @@
 #
 # ── CLASSIFICATION BACKTEST PARAMS ────────────────────────────────────────────
 #   These are fixed — never change — so all stocks are compared on equal footing.
-#   risk=0.10  rr=4  cooldown=50  stop_filter=0.3%-1.2%
+#   risk=0.01  rr=4  cooldown=50  stop_filter=0.3%-1.2%
 #
 # ── PERSISTENCE ───────────────────────────────────────────────────────────────
 #   Tiers saved to data/tier_cache.json
@@ -54,7 +54,7 @@ CACHE_PATH = "data/tier_cache.json"
 # Fixed neutral params used for classification backtest
 # Do NOT change these — they define the benchmark
 _CLASS_PRESET = {
-    "risk_per_trade":     0.10,
+    "risk_per_trade":     0.01,
     "rr_target":          4,
     "cooldown":           50,
     "min_price_distance": 5,
@@ -78,7 +78,7 @@ TIER_CONFIGS = {
     1: {
         "tier":               1,
         "label":              "Tier 1 — Strong trend",
-        "risk_per_trade":     0.15,   # 15% of balance risked per trade
+        "risk_per_trade":     0.015,  # 1.5% of balance risked per trade
         "cooldown":           30,     # 30 × 5min = 150min between entries
         "min_stop_pct":       0.003,
         "max_stop_pct":       0.012,
@@ -87,7 +87,7 @@ TIER_CONFIGS = {
     2: {
         "tier":               2,
         "label":              "Tier 2 — Moderate",
-        "risk_per_trade":     0.10,
+        "risk_per_trade":     0.010,  # 1.0% of balance risked per trade
         "cooldown":           50,     # 50 × 5min = 250min between entries
         "min_stop_pct":       0.003,
         "max_stop_pct":       0.012,
