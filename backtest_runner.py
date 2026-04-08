@@ -96,8 +96,8 @@ def run_backtest(symbol: str, preset: dict) -> dict:
     max_stop_pct = float(_resolve("max_stop_pct",        0.012))
     # Cost-efficiency gate for small-capital backtests:
     # keep only setups where target gross is meaningfully above charges.
-    # Override from preset if needed; e.g. 0 disables, 2.0 is strict.
-    min_tcr      = float(_resolve("min_target_charge_ratio", 1.5))
+    # Override from preset if needed; e.g. 0 disables, 2.0 is stricter.
+    min_tcr      = float(_resolve("min_target_charge_ratio", 2.0))
 
     try:
         df_1m  = load_csv(csv_path)

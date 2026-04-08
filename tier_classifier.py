@@ -130,10 +130,13 @@ def _save_cache(cache: dict):
 
 # ── Core classification ───────────────────────────────────────────────────────
 
-def _compute_gc_ratio(symbol: str) -> float | None:
+def _compute_class_metrics(symbol: str) -> tuple[float | None, float | None]:
     """
     Run classification backtest on symbol.
-    Returns G/C ratio (avg_gross / avg_charge per trade).
+    Returns:
+      (gc_ratio, return_pct)
+      gc_ratio   = avg_gross / avg_charge per trade
+      return_pct = final backtest return percentage
     Returns None if CSV missing or no trades generated.
     """
     # Lazy import to avoid circular deps
@@ -164,23 +167,28 @@ def _compute_gc_ratio(symbol: str) -> float | None:
         br.LTFEntry = original_LTF
 
     if result.get("error") or not result.get("trades"):
-        return None
+        return None, None
 
     tl = pd.DataFrame(result["trade_log"])
     if len(tl) == 0:
-        return None
+        return None, None
 
     avg_gross  = tl["gross_pnl"].mean()
     avg_charge = tl["charges"].mean()
 
     if avg_charge <= 0:
-        return None
+        return None, None
 
-    return round(avg_gross / avg_charge, 3)
+    return round(avg_gross / avg_charge, 3), float(result.get("return_pct", 0.0))
 
 
-def _gc_to_tier(gc: float | None) -> int:
-    if gc is None:
+def _gc_to_tier(gc: float | None, return_pct: float | None) -> int:
+    # Hard safety filter:
+    # if the neutral classification backtest is not profitable,
+    # force Tier 3 (skip) regardless of G/C.
+    if gc is None or return_pct is None:
+        return 3
+    if return_pct <= 0:
         return 3
     if gc >= TIER1_THRESHOLD:
         return 1
@@ -230,13 +238,14 @@ def classify_symbol(symbol: str, force: bool = False) -> dict:
 
         # ── Actually classify (runs backtest once) ───────────────────────────
         print(f"[Classifier] Classifying {symbol}...")
-        gc   = _compute_gc_ratio(symbol)
-        tier = _gc_to_tier(gc)
+        gc, return_pct = _compute_class_metrics(symbol)
+        tier = _gc_to_tier(gc, return_pct)
 
         entry = {
             "symbol":        symbol,
             "tier":          tier,
             "gc_ratio":      gc,
+            "return_pct":    round(return_pct, 2) if return_pct is not None else None,
             "label":         TIER_CONFIGS[tier]["label"],
             "classified_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
@@ -247,7 +256,8 @@ def classify_symbol(symbol: str, force: bool = False) -> dict:
         cache[symbol] = entry
         _save_cache(cache)
 
-        print(f"[Classifier] {symbol} → Tier {tier}  G/C={gc}x  ({TIER_CONFIGS[tier]['label']})")
+        rp = entry["return_pct"]
+        print(f"[Classifier] {symbol} → Tier {tier}  G/C={gc}x  Ret={rp}%  ({TIER_CONFIGS[tier]['label']})")
         return {**entry, "config": TIER_CONFIGS[tier]}
 
 
