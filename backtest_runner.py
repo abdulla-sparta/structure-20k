@@ -94,6 +94,10 @@ def run_backtest(symbol: str, preset: dict) -> dict:
     min_dist     = float(_resolve("min_price_distance",  CONFIG["min_price_distance"]))
     min_stop_pct = float(_resolve("min_stop_pct",        0.003))
     max_stop_pct = float(_resolve("max_stop_pct",        0.012))
+    # Cost-efficiency gate for small-capital backtests:
+    # keep only setups where target gross is meaningfully above charges.
+    # Override from preset if needed; e.g. 0 disables, 2.0 is strict.
+    min_tcr      = float(_resolve("min_target_charge_ratio", 1.5))
 
     try:
         df_1m  = load_csv(csv_path)
@@ -106,6 +110,7 @@ def run_backtest(symbol: str, preset: dict) -> dict:
         balance=CONFIG["starting_balance"],
         risk_per_trade=risk,
         symbol=symbol,
+        min_target_charge_ratio=min_tcr,
     )
     engine = TradeEngine(
         broker,
@@ -178,6 +183,7 @@ def run_backtest(symbol: str, preset: dict) -> dict:
             "cooldown": cooldown,
             "stop_min": round(min_stop_pct * 100, 1),
             "stop_max": round(max_stop_pct * 100, 1),
+            "min_tcr":  round(min_tcr, 2),
         },
         "trade_log":  broker.trade_log,
     }
