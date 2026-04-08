@@ -92,6 +92,7 @@ def run_backtest(symbol: str, preset: dict) -> dict:
     rr           = float(_resolve("rr_target",          CONFIG["rr_target"]))
     cooldown     = int(_resolve("cooldown",              CONFIG["cooldown"]))
     min_dist     = float(_resolve("min_price_distance",  CONFIG["min_price_distance"]))
+    start_balance= float(_resolve("starting_balance",    CONFIG["starting_balance"]))
     min_stop_pct = float(_resolve("min_stop_pct",        0.003))
     max_stop_pct = float(_resolve("max_stop_pct",        0.012))
     # Cost-efficiency gate for small-capital backtests:
@@ -107,7 +108,7 @@ def run_backtest(symbol: str, preset: dict) -> dict:
         return {"symbol": symbol, "error": str(e), "return_pct": -9999}
 
     broker = PaperBroker(
-        balance=CONFIG["starting_balance"],
+        balance=start_balance,
         risk_per_trade=risk,
         symbol=symbol,
         min_target_charge_ratio=min_tcr,
@@ -138,7 +139,7 @@ def run_backtest(symbol: str, preset: dict) -> dict:
 
     total = len(broker.trade_log)
     wins  = sum(1 for t in broker.trade_log if t["net_pnl"] > 0)
-    start = CONFIG["starting_balance"]
+    start = start_balance
     net   = broker.total_net_pnl
 
     # ── Persist final bias to DB so live engine inherits it ──────────────────
