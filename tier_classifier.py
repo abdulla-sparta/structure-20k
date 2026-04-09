@@ -15,7 +15,7 @@
 #
 #   Tier 3 (G/C < 1.0x) — Choppy / strategy doesn't suit
 #     → SKIPPED in live trading entirely
-#     → Still shown in backtest UI with tier label
+#     → Still shown in backtest UI with tier labels
 #
 # ── G/C RATIO ─────────────────────────────────────────────────────────────────
 #   G/C = avg_gross_per_trade / avg_charge_per_trade
