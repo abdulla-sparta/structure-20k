@@ -28,12 +28,17 @@ class PaperBroker:
     LEVERAGE            = 5          # 5x MTF intraday (20% margin)
 
     def __init__(self, balance: float, risk_per_trade: float = 0.01,
-                 symbol: str = "", live_mode: bool = False):
+                 symbol: str = "", live_mode: bool = False,
+                 min_target_charge_ratio: float = 0.0):
         self.starting_balance = balance
         self.balance          = balance
         self.risk_per_trade   = risk_per_trade
         self.symbol           = symbol
         self.live_mode        = live_mode
+        # Optional trade-quality gate:
+        # skip entry if expected target gross is too small vs round-trip charges.
+        # 0.0 disables the gate (default for live compatibility).
+        self.min_target_charge_ratio = float(min_target_charge_ratio or 0.0)
 
         self.position   = None
         self.trade_log  = []
@@ -68,6 +73,17 @@ class PaperBroker:
 
             if qty <= 0:
                 return None
+
+            # Optional cost-efficiency filter:
+            # if full-target payout cannot cover charges with adequate multiple,
+            # the trade is structurally weak on small capital — skip it.
+            if self.min_target_charge_ratio > 0 and target > 0:
+                potential_gross = abs(target - price) * qty
+                est_charges = self._calc_charges(price, target, qty)
+                if est_charges > 0:
+                    gc = potential_gross / est_charges
+                    if gc < self.min_target_charge_ratio:
+                        return None
 
             self.position = {
                 "side":        side,

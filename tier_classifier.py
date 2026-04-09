@@ -6,11 +6,11 @@
 # ── TIER DEFINITIONS ──────────────────────────────────────────────────────────
 #
 #   Tier 1 (G/C > 2.0x) — Strong trending stock
-#     → risk=0.15%  cooldown=40 candles  min_stop=0.3%  max_stop=1.2%
+#     → risk=1.5%   cooldown=40 candles  min_stop=0.3%  max_stop=1.2%
 #     → "Let it run" — higher allocation, tighter cooldown
 #
 #   Tier 2 (G/C 1.0–2.0x) — Moderate, tradeable with discipline
-#     → risk=0.10%  cooldown=50 candles  min_stop=0.3%  max_stop=1.2%
+#     → risk=1.0%   cooldown=50 candles  min_stop=0.3%  max_stop=1.2%
 #     → Standard settings
 #
 #   Tier 3 (G/C < 1.0x) — Choppy / strategy doesn't suit
@@ -24,7 +24,7 @@
 #
 # ── CLASSIFICATION BACKTEST PARAMS ────────────────────────────────────────────
 #   These are fixed — never change — so all stocks are compared on equal footing.
-#   risk=0.10  rr=4  cooldown=50  stop_filter=0.3%-1.2%
+#   risk=0.01  rr=4  cooldown=50  stop_filter=0.3%-1.2%
 #
 # ── PERSISTENCE ───────────────────────────────────────────────────────────────
 #   Tiers saved to data/tier_cache.json
@@ -54,7 +54,7 @@ CACHE_PATH = "data/tier_cache.json"
 # Fixed neutral params used for classification backtest
 # Do NOT change these — they define the benchmark
 _CLASS_PRESET = {
-    "risk_per_trade":     0.10,
+    "risk_per_trade":     0.01,
     "rr_target":          4,
     "cooldown":           50,
     "min_price_distance": 5,
@@ -78,7 +78,7 @@ TIER_CONFIGS = {
     1: {
         "tier":               1,
         "label":              "Tier 1 — Strong trend",
-        "risk_per_trade":     0.15,   # 15% of balance risked per trade
+        "risk_per_trade":     0.015,  # 1.5% of balance risked per trade
         "cooldown":           30,     # 30 × 5min = 150min between entries
         "min_stop_pct":       0.003,
         "max_stop_pct":       0.012,
@@ -87,7 +87,7 @@ TIER_CONFIGS = {
     2: {
         "tier":               2,
         "label":              "Tier 2 — Moderate",
-        "risk_per_trade":     0.10,
+        "risk_per_trade":     0.010,  # 1.0% of balance risked per trade
         "cooldown":           50,     # 50 × 5min = 250min between entries
         "min_stop_pct":       0.003,
         "max_stop_pct":       0.012,
@@ -130,10 +130,13 @@ def _save_cache(cache: dict):
 
 # ── Core classification ───────────────────────────────────────────────────────
 
-def _compute_gc_ratio(symbol: str) -> float | None:
+def _compute_class_metrics(symbol: str) -> tuple[float | None, float | None]:
     """
     Run classification backtest on symbol.
-    Returns G/C ratio (avg_gross / avg_charge per trade).
+    Returns:
+      (gc_ratio, return_pct)
+      gc_ratio   = avg_gross / avg_charge per trade
+      return_pct = final backtest return percentage
     Returns None if CSV missing or no trades generated.
     """
     # Lazy import to avoid circular deps
@@ -164,23 +167,28 @@ def _compute_gc_ratio(symbol: str) -> float | None:
         br.LTFEntry = original_LTF
 
     if result.get("error") or not result.get("trades"):
-        return None
+        return None, None
 
     tl = pd.DataFrame(result["trade_log"])
     if len(tl) == 0:
-        return None
+        return None, None
 
     avg_gross  = tl["gross_pnl"].mean()
     avg_charge = tl["charges"].mean()
 
     if avg_charge <= 0:
-        return None
+        return None, None
 
-    return round(avg_gross / avg_charge, 3)
+    return round(avg_gross / avg_charge, 3), float(result.get("return_pct", 0.0))
 
 
-def _gc_to_tier(gc: float | None) -> int:
-    if gc is None:
+def _gc_to_tier(gc: float | None, return_pct: float | None) -> int:
+    # Hard safety filter:
+    # if the neutral classification backtest is not profitable,
+    # force Tier 3 (skip) regardless of G/C.
+    if gc is None or return_pct is None:
+        return 3
+    if return_pct <= 0:
         return 3
     if gc >= TIER1_THRESHOLD:
         return 1
@@ -230,13 +238,14 @@ def classify_symbol(symbol: str, force: bool = False) -> dict:
 
         # ── Actually classify (runs backtest once) ───────────────────────────
         print(f"[Classifier] Classifying {symbol}...")
-        gc   = _compute_gc_ratio(symbol)
-        tier = _gc_to_tier(gc)
+        gc, return_pct = _compute_class_metrics(symbol)
+        tier = _gc_to_tier(gc, return_pct)
 
         entry = {
             "symbol":        symbol,
             "tier":          tier,
             "gc_ratio":      gc,
+            "return_pct":    round(return_pct, 2) if return_pct is not None else None,
             "label":         TIER_CONFIGS[tier]["label"],
             "classified_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
@@ -247,7 +256,8 @@ def classify_symbol(symbol: str, force: bool = False) -> dict:
         cache[symbol] = entry
         _save_cache(cache)
 
-        print(f"[Classifier] {symbol} → Tier {tier}  G/C={gc}x  ({TIER_CONFIGS[tier]['label']})")
+        rp = entry["return_pct"]
+        print(f"[Classifier] {symbol} → Tier {tier}  G/C={gc}x  Ret={rp}%  ({TIER_CONFIGS[tier]['label']})")
         return {**entry, "config": TIER_CONFIGS[tier]}
 
 
