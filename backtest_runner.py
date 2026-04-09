@@ -60,16 +60,18 @@ def run_backtest(symbol: str, preset: dict) -> dict:
             "return_pct": -9999,
         }
 
-    # ── Resolve config: tier config → preset override → global CONFIG ────────
-    # If preset explicitly passes risk/cooldown, those win (backtest UI).
-    # Otherwise use the symbol's tier config (auto-classified).
+    # ── Resolve config: preset override → tier config → global CONFIG ─────────
+    # Backtest UI should honor user-entered params first.
+    # Tier config is optional and can be enabled via:
+    #   preset["apply_tier_overrides"] = True
     tier_cfg = {}
     tier_num = None
     gc_ratio = None
+    apply_tier_overrides = bool(preset.get("apply_tier_overrides", False))
     try:
         from tier_classifier import _mem_cache, TIER_CONFIGS
         import copy
-        if symbol in _mem_cache:
+        if apply_tier_overrides and symbol in _mem_cache:
             cached   = _mem_cache[symbol]
             tier_cfg = copy.copy(TIER_CONFIGS[cached["tier"]])
             tier_num = cached["tier"]
@@ -78,27 +80,25 @@ def run_backtest(symbol: str, preset: dict) -> dict:
         pass
 
     def _resolve(key, default):
-        # tier config wins for risk + cooldown + stop filter
-        # UI preset wins for rr_target + min_price_distance
-        tier_priority_keys = {"risk_per_trade", "cooldown", "min_stop_pct", "max_stop_pct"}
-        if key in tier_priority_keys:
-            if key in tier_cfg:
-                return tier_cfg[key]
-            if key in preset and preset[key] is not None:
-                return preset[key]
-        else:
-            if key in preset and preset[key] is not None:
-                return preset[key]
-            if key in tier_cfg:
-                return tier_cfg[key]
+        # Backtest/custom preset always has priority.
+        # Tier config is only a fallback when explicitly enabled.
+        if key in preset and preset[key] is not None:
+            return preset[key]
+        if key in tier_cfg:
+            return tier_cfg[key]
         return default
 
     risk         = float(_resolve("risk_per_trade",     CONFIG["risk_per_trade"]))
     rr           = float(_resolve("rr_target",          CONFIG["rr_target"]))
     cooldown     = int(_resolve("cooldown",              CONFIG["cooldown"]))
     min_dist     = float(_resolve("min_price_distance",  CONFIG["min_price_distance"]))
+    start_balance= float(_resolve("starting_balance",    CONFIG["starting_balance"]))
     min_stop_pct = float(_resolve("min_stop_pct",        0.003))
     max_stop_pct = float(_resolve("max_stop_pct",        0.012))
+    # Cost-efficiency gate for small-capital backtests:
+    # keep only setups where target gross is meaningfully above charges.
+    # Override from preset if needed; e.g. 0 disables, 2.0 is stricter.
+    min_tcr      = float(_resolve("min_target_charge_ratio", 2.0))
 
     try:
         df_1m  = load_csv(csv_path)
@@ -108,9 +108,10 @@ def run_backtest(symbol: str, preset: dict) -> dict:
         return {"symbol": symbol, "error": str(e), "return_pct": -9999}
 
     broker = PaperBroker(
-        balance=CONFIG["starting_balance"],
+        balance=start_balance,
         risk_per_trade=risk,
         symbol=symbol,
+        min_target_charge_ratio=min_tcr,
     )
     engine = TradeEngine(
         broker,
@@ -138,7 +139,7 @@ def run_backtest(symbol: str, preset: dict) -> dict:
 
     total = len(broker.trade_log)
     wins  = sum(1 for t in broker.trade_log if t["net_pnl"] > 0)
-    start = CONFIG["starting_balance"]
+    start = start_balance
     net   = broker.total_net_pnl
 
     # ── Persist final bias to DB so live engine inherits it ──────────────────
@@ -183,6 +184,7 @@ def run_backtest(symbol: str, preset: dict) -> dict:
             "cooldown": cooldown,
             "stop_min": round(min_stop_pct * 100, 1),
             "stop_max": round(max_stop_pct * 100, 1),
+            "min_tcr":  round(min_tcr, 2),
         },
         "trade_log":  broker.trade_log,
     }

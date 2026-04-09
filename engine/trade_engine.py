@@ -138,11 +138,13 @@ class TradeEngine:
                 self._save_state()
             return
 
-        # 5. Session filter — live only
-        if not self._is_backtest and CONFIG.get("mode") == "live":
-            if not is_entry_allowed(current_time):
+        # 5. Session filter
+        # Apply in BOTH live and backtest so entries are realistic and
+        # don't fire near force-exit where charges dominate tiny moves.
+        if not is_entry_allowed(current_time):
+            if not self._is_backtest and CONFIG.get("mode") == "live":
                 self._save_state()
-                return
+            return
 
         # 6. Guards
         if not self.current_bias:

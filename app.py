@@ -493,9 +493,26 @@ def api_run_backtest():
         "rr_target":          float(data.get("rr_target",      CONFIG["rr_target"])),
         "cooldown":           int(data.get("cooldown",          CONFIG["cooldown"])),
         "min_price_distance": float(data.get("min_price_distance", CONFIG["min_price_distance"])),
+        "starting_balance":   float(data.get("starting_balance", CONFIG.get("starting_balance", 20000))),
+        "apply_tier_overrides": bool(data.get("apply_tier_overrides", False)),
     }
 
     targets = symbols or [i["symbol"] for i in INSTRUMENTS]
+    # Optional: trade only good structure symbols (Tier 1/2), skip choppy Tier 3.
+    if bool(data.get("filter_choppy", False)):
+        try:
+            from tier_classifier import classify_symbol, get_all_tiers
+            tier_map = get_all_tiers()
+            filtered = []
+            for sym in targets:
+                t = tier_map.get(sym)
+                if not t:
+                    t = classify_symbol(sym, force=False)
+                if int(t.get("tier", 3)) in (1, 2):
+                    filtered.append(sym)
+            targets = filtered
+        except Exception as e:
+            print(f"[BT] Tier filter warning: {e}")
 
     # CUSTOM MODE ONLY — no preset comparisons
     _bt_progress.update({
@@ -522,7 +539,7 @@ def api_run_backtest():
         }
         socketio.emit("bt_progress", {**_bt_progress})
 
-    rows = run_backtest_all(preset=custom_preset, symbols=symbols,
+    rows = run_backtest_all(preset=custom_preset, symbols=targets,
                             on_progress=on_progress)
     all_results = {"Custom": rows}
 
