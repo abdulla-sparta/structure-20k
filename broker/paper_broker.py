@@ -5,9 +5,11 @@
 #
 #   qty_risk    = (balance × risk_per_trade) / stop_distance
 #   qty_capital = (balance × 5) / price          ← hardcoded 5x MTF
-#   qty         = floor(min(qty_risk, qty_capital))
+#   qty         = floor(min(qty_risk, qty_capital))    [backtest mode]
+#   qty         = floor(qty_capital)                   [live mode]
 #
-# qty_capital is the hard cap — no external imports, cannot fail.
+# In LIVE, we size to full margin capacity (as in Upstox intraday quantity
+# panel) so capital is fully utilised per configured symbol balance.
 # 5x = 20% margin requirement (standard Upstox MTF intraday).
 #
 # FIX (2026-03-12): Added threading.Lock() around position open/close
@@ -67,9 +69,12 @@ class PaperBroker:
             if stop_distance <= 0:
                 return None
 
-            qty_risk    = (self.balance * self.risk_per_trade) / stop_distance
             qty_capital = (self.balance * self.LEVERAGE) / price
-            qty         = math.floor(min(qty_risk, qty_capital))
+            if self.live_mode:
+                qty = math.floor(qty_capital)
+            else:
+                qty_risk = (self.balance * self.risk_per_trade) / stop_distance
+                qty      = math.floor(min(qty_risk, qty_capital))
 
             if qty <= 0:
                 return None
