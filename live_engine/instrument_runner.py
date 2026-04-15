@@ -278,9 +278,24 @@ class InstrumentRunner:
         pc  = self.prev_close
         chg     = round(ltp - pc, 2)         if ltp and pc else None
         chg_pct = round((chg / pc) * 100, 2) if chg and pc else None
-        # Build daily trades list for UI (today's closed trades)
-        from datetime import date as _date
-        today_str = str(_date.today())
+        # Build daily trades list for UI (today's closed trades).
+        # Use IST day boundary (market timezone), and prefer exit_time so
+        # trades opened previous day but closed today still appear.
+        from datetime import datetime as _dt
+        try:
+            from zoneinfo import ZoneInfo as _ZoneInfo
+            today_str = _dt.now(_ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d")
+        except Exception:
+            today_str = _dt.now().strftime("%Y-%m-%d")
+
+        def _day_key(v):
+            if v is None:
+                return ""
+            s = str(v).strip()
+            if len(s) >= 10 and s[4] == "-" and s[7] == "-":
+                return s[:10]
+            return ""
+
         daily_trades = [
             {
                 "direction":   t.get("side", t.get("direction", "")),
@@ -295,7 +310,10 @@ class InstrumentRunner:
                 "reason":      t.get("reason", ""),
             }
             for t in b.trade_log
-            if str(t.get("entry_time", "")).startswith(today_str)
+            if (
+                _day_key(t.get("exit_time", "")) == today_str
+                or _day_key(t.get("entry_time", "")) == today_str
+            )
         ]
         realised   = sum(t["net_pnl"] for t in daily_trades)
         unrealised = round(b.get_equity(ltp or b.balance) - b.balance, 2) if b.position else 0.0

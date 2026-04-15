@@ -204,6 +204,8 @@ const socket = io();
 let engineRunning = false;
 let symbolData = {};
 let instruments = [];
+let socketConnected = false;
+let engineFeedConnected = null;
 
 /* ── Dynamic card sorting ────────────────────────────────────────────────────
    Sort order (re-runs every live_update = every 0.5s):
@@ -311,11 +313,18 @@ fetch('/locked_config').then(r=>r.json()).then(c=>{
 });
 
 /* ── SocketIO events ─────────────────────────────────────────────── */
-socket.on('connect',    ()=>setConn(true));
-socket.on('disconnect', ()=>setConn(false));
+socket.on('connect', ()=>{
+  socketConnected = true;
+  refreshConn();
+});
+socket.on('disconnect', ()=>{
+  socketConnected = false;
+  refreshConn();
+});
 
 socket.on('live_update', data=>{
-  setConn(data.connected);
+  engineFeedConnected = !!data.connected;
+  refreshConn();
   if(data.instruments){
     engineRunning = true;
     startLtpPoll();
@@ -422,6 +431,20 @@ socket.on('engine_error', data=>{
 function setConn(ok){
   document.getElementById('connDot').className='conn-dot '+(ok?'live':'dead');
   document.getElementById('connLabel').textContent=ok?'Live':'Disconnected';
+}
+
+function refreshConn(){
+  const dot = document.getElementById('connDot');
+  const label = document.getElementById('connLabel');
+  if(!socketConnected){
+    dot.className = 'conn-dot dead';
+    label.textContent = 'Disconnected';
+    return;
+  }
+  // Browser socket is healthy. If broker feed drops, keep UI marked live
+  // but surface degraded feed status instead of full disconnect.
+  dot.className = 'conn-dot live';
+  label.textContent = engineFeedConnected === false ? 'Live · Feed issue' : 'Live';
 }
 
 function startAll(){
