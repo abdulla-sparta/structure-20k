@@ -126,19 +126,16 @@ class TradeEngine:
                     self._send_kill_switch_alert(threshold)
                 if CONFIG.get("mode") == "live":
                     self._save_state()
-                # Kill switch only blocks NEW entries.
-                # Always fall through to step 4 so EOD force-exit still fires.
+                # Only block new entries — still allow existing position to exit
+                if not self.broker.position:
+                    return
 
-        # 4. Force exit at session end — runs regardless of kill switch state
+        # 4. Force exit at session end
         if is_force_exit_time(current_time):
             if self.broker.position:
                 self.broker.force_close(price=price, time=candle.name)
             if not self._is_backtest and CONFIG.get("mode") == "live":
                 self._save_state()
-            return
-
-        # 5a. Kill switch blocks new entries after EOD check passes
-        if self.kill_switch_triggered:
             return
 
         # 5. Session filter
@@ -207,6 +204,17 @@ class TradeEngine:
             self.scheduler.check(candle_time=candle.name, current_price=price)
             self._save_state()
 
+    def reset_kill_switch(self):
+        """
+        Manually reset the kill switch so new entries are allowed again.
+        Resets equity_peak to current balance so threshold recalculates cleanly.
+        Persists the reset to DB immediately so it survives engine restarts.
+        """
+        self.kill_switch_triggered = False
+        self.equity_peak           = self.broker.balance
+        self._save_state()   # ← persist to DB so restart doesn't bring it back
+        print(f"[{self.symbol}] ✅ Kill switch reset — peak=₹{self.equity_peak:,.0f}, saved to DB")
+
     def get_summary(self) -> dict:
         b     = self.broker
         start = b.starting_balance
@@ -248,9 +256,7 @@ class TradeEngine:
     def _save_state(self):
         if self._is_backtest or CONFIG.get("mode") != "live":
             return
-        from datetime import date as _today_date
         self.state_manager.save({
-            "date":                  str(_today_date.today()),
             "current_bias":          self.current_bias,
             "last_entry_index":      self.last_entry_index,
             "last_entry_price":      self.last_entry_price,
@@ -272,15 +278,7 @@ class TradeEngine:
         self.last_entry_index      = state.get("last_entry_index", -1000)
         self.last_entry_price      = state.get("last_entry_price")
         self.equity_peak           = state.get("equity_peak") or self.broker.balance
-
-        # Kill switch resets every new trading day — only restore if state is from TODAY.
-        # This prevents a kill switch triggered yesterday from blocking entries indefinitely.
-        from datetime import date as _ks_date
-        state_date = str(state.get("date", ""))
-        if state_date == str(_ks_date.today()):
-            self.kill_switch_triggered = state.get("kill_switch_triggered", False)
-        else:
-            self.kill_switch_triggered = False  # fresh day — start clean
+        self.kill_switch_triggered = state.get("kill_switch_triggered", False)
 
         # Only restore open position if it's from TODAY — never replay a stale
         # position from a previous trading day (causes duplicate DB writes).

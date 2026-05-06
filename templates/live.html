@@ -44,6 +44,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .btn:hover{opacity:.88}
 .btn-start{background:var(--green);color:#fff}
 .btn-start.running{background:var(--muted)}
+.btn-exit-all{background:#7c3aed;color:#fff;margin-left:8px}
+.btn-exit-all:disabled{opacity:.45;cursor:not-allowed}
 .btn-back{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
 .port-bar{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-bottom:1px solid var(--border);padding:0}
 .port-cell{padding:10px 16px;border-right:1px solid var(--border);text-align:center}
@@ -90,9 +92,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .kill-fired{color:var(--red);font-weight:600;animation:blink 1s step-end infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .kill-bar-wrap{flex:1;margin:0 10px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
-.kill-bar{height:100%;border-radius:2px;background:var(--green);transition:width .5s}
 .btn-reset-ks{padding:3px 10px;border-radius:5px;border:1px solid rgba(0,102,0,0.45);background:rgba(255,255,255,0.18);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s;white-space:nowrap;flex-shrink:0}
 .btn-reset-ks:hover{background:rgba(255,255,255,0.35)}
+.kill-bar{height:100%;border-radius:2px;background:var(--green);transition:width .5s}
 .card-log{padding:10px 14px;flex:1}
 .log-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;justify-content:space-between}
 .log-table{width:100%;border-collapse:collapse;font-size:11px}
@@ -181,6 +183,7 @@ table.ltl-table{width:100%;border-collapse:collapse;font-size:12px}
   </div>
   <button class="btn btn-start" id="btnStart" onclick="startAll()">▶ Start All</button>
   <button class="btn" id="btnStop" onclick="stopEngine()" style="display:none;background:#dc2626;color:#fff;margin-left:8px">⏹ Stop Engine</button>
+  <button class="btn btn-exit-all" id="btnExitAll" onclick="exitAllPositions()" title="Force-close all open positions at current LTP">⚡ Exit All Positions</button>
 </div>
 
 <div class="port-bar">
@@ -705,6 +708,7 @@ function ltlFetch(symbol, date){
 function closeLTL(e){ if(e.target===document.getElementById('ltlOverlay')) closeLTLBtn(); }
 function closeLTLBtn(){ document.getElementById('ltlOverlay').classList.remove('open'); document.body.style.overflow=''; }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLTLBtn(); });
+
 async function resetKillSwitch(symbol) {
   if (!confirm('Reset kill switch for ' + symbol + '?\nThis will allow new entries and is saved permanently.')) return;
   try {
@@ -713,24 +717,71 @@ async function resetKillSwitch(symbol) {
       body: JSON.stringify({symbol})
     });
     const data = await res.json();
-    const toast = document.getElementById('ks-toast') || (() => {
-      const t = document.createElement('div'); t.id='ks-toast';
-      t.style.cssText='position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;color:#fff;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s';
-      document.body.appendChild(t); return t;
-    })();
+    const t = _getToast();
     if (data.status === 'ok') {
-      toast.textContent = '✅ Kill switch reset for ' + symbol + ' — saved to DB';
-      toast.style.background = '#16a34a';
+      t.textContent = '✅ Kill switch reset for ' + symbol + ' — saved to DB';
+      t.style.background = '#16a34a';
     } else {
-      toast.textContent = '❌ ' + (data.error || 'Reset failed');
-      toast.style.background = '#dc2626';
+      t.textContent = '❌ ' + (data.error || 'Reset failed');
+      t.style.background = '#dc2626';
     }
-    toast.style.opacity = '1';
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+    t.style.opacity = '1';
+    clearTimeout(t._t);
+    t._t = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+  } catch(e) { console.error('resetKillSwitch error:', e); }
+}
+
+async function exitAllPositions(){
+  const btn = document.getElementById('btnExitAll');
+  if (!confirm('⚡ Force-close ALL open positions at current LTP?\n\nThis cannot be undone.')) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Exiting…';
+  try {
+    const res  = await fetch('/live_status');
+    const data = await res.json();
+    const open = (data.instruments || []).filter(i => i.position && i.position.side);
+    if (!open.length) {
+      toast('✅ No open positions to close');
+      btn.disabled = false; btn.textContent = '⚡ Exit All Positions'; return;
+    }
+    toast(`⚡ Closing ${open.length} position(s)…`);
+    let closed = 0, failed = 0;
+    await Promise.all(open.map(async i => {
+      try {
+        const r = await fetch('/close_position', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({symbol: i.symbol})
+        });
+        const result = await r.json();
+        if (result.status === 'ok' || result.closed) { closed++; }
+        else { failed++; }
+      } catch(e) { failed++; }
+    }));
+    await Promise.all(open.map(async i => {
+      try {
+        await fetch('/reset_kill_switch', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({symbol: i.symbol})
+        });
+      } catch(e) {}
+    }));
+    try {
+      await fetch('/reset_portfolio_halt', {method:'POST'});
+    } catch(e) {}
+    toast(failed === 0 ? `✅ ${closed} position(s) closed` : `⚠ ${closed} closed, ${failed} failed`);
   } catch(e) {
-    console.error('resetKillSwitch error:', e);
+    toast('❌ Error — check console'); console.error(e);
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Exit All Positions';
   }
+}
+
+function _getToast() {
+  return document.getElementById('ks-toast') || (() => {
+    const t = document.createElement('div'); t.id='ks-toast';
+    t.style.cssText='position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;color:#fff;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s';
+    document.body.appendChild(t); return t;
+  })();
 }
 </script>
 
