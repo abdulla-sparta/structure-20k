@@ -27,8 +27,10 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 app.register_blueprint(reports_bp)
 
 live_runner = None
+ob_runner   = None       # OB experiment runner (TRENT + M&M)
 _signal_log = []   # in-memory signal history (last 200)
 _runner_lock = threading.Lock()
+_ob_lock     = threading.Lock()
 
 # ── Data fetch state (Railway startup) ────────────────────────────────────────
 _fetch_status = {"done": False, "running": False, "results": {}, "error": None}
@@ -1212,22 +1214,60 @@ def api_signals():
     return jsonify(_signal_log)
 
 
-@app.route("/reset_kill_switch", methods=["POST"])
-def reset_kill_switch():
-    """Reset kill switch for a symbol — re-enables entries without restarting."""
-    if not live_runner:
-        return jsonify({"error": "Engine not running"}), 400
-    symbol = (request.json or {}).get("symbol", "").upper()
-    for runner in live_runner.runners.values():
-        if runner.symbol == symbol:
-            runner.engine.kill_switch_triggered = False
-            # Reset equity peak to current equity so threshold is recalculated cleanly
-            ltp = runner.last_price or 0
-            runner.engine.equity_peak = runner.broker.get_equity(ltp) if ltp else runner.broker.balance
-            runner.engine._save_state()
-            print(f"[KS] Kill switch reset for {symbol} by user")
-            return jsonify({"status": "ok", "symbol": symbol})
-    return jsonify({"error": f"{symbol} not found"}), 404
+# ── ORDER BOOK EXPERIMENT — /ob ───────────────────────────────────────────────
+
+@app.route("/ob")
+def ob_page():
+    """OB experiment page — TRENT + M&M order book entries."""
+    locked = db.get("locked_config") or {}
+    return render_template("ob.html", locked=locked)
+
+
+@app.route("/ob/start", methods=["POST"])
+def ob_start():
+    global ob_runner
+    with _ob_lock:
+        if ob_runner and ob_runner.is_running():
+            return jsonify({"status": "already_running"})
+        if live_runner is None or not live_runner.is_connected():
+            return jsonify({"status": "error",
+                            "message": "Main engine must be running first"}), 400
+        try:
+            from live_engine.ob_runner import OBRunner
+            ob_runner = OBRunner(
+                main_runner   = live_runner,
+                socketio_emit = socketio.emit,
+            )
+            result = ob_runner.start()
+            if result.get("status") == "error":
+                ob_runner = None
+                return jsonify(result), 400
+            return jsonify({"status": "ok", "message": "OB engine started"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/ob/stop", methods=["POST"])
+def ob_stop():
+    global ob_runner
+    with _ob_lock:
+        if ob_runner is None:
+            return jsonify({"status": "not_running"})
+        try:
+            ob_runner.stop()
+            ob_runner = None
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/ob/status")
+def ob_status():
+    if ob_runner is None or not ob_runner.is_running():
+        return jsonify({"running": False, "instruments": [],
+                        "total_realised": 0, "total_unreal": 0, "total_net": 0})
+    payload = ob_runner._get_payload()
+    return jsonify(_sanitize_for_json(payload))
 
 
 @app.route("/close_position", methods=["POST"])
@@ -1246,6 +1286,52 @@ def api_close_position():
             result = runner.broker.force_close(ltp, pd.Timestamp.now(tz="Asia/Kolkata"))
             return jsonify({"status": "ok", "symbol": symbol, "closed": result})
     return jsonify({"error": f"{symbol} not found"}), 404
+
+
+@app.route("/reset_kill_switch", methods=["POST"])
+def api_reset_kill_switch():
+    """
+    Manually reset kill switch for a symbol.
+    Resets in-memory state AND saves to DB so it survives restarts.
+    POST body: { "symbol": "TRENT" }
+    """
+    if not live_runner:
+        return jsonify({"error": "Engine not running"}), 400
+    data   = request.get_json(silent=True) or {}
+    symbol = data.get("symbol", "").upper()
+    if not symbol:
+        return jsonify({"error": "symbol required"}), 400
+    for runner in live_runner.runners.values():
+        if runner.symbol == symbol:
+            runner.engine.reset_kill_switch()
+            try:
+                socketio.emit("live_update", {
+                    "connected":        live_runner.is_connected(),
+                    "portfolio_equity": live_runner.get_portfolio_equity(),
+                    "instruments":      _sanitize_for_json(live_runner.get_all_status()),
+                })
+            except Exception:
+                pass
+            return jsonify({
+                "status":  "ok",
+                "symbol":  symbol,
+                "message": f"Kill switch reset for {symbol} — saved to DB.",
+            })
+    return jsonify({"error": f"{symbol} not found"}), 404
+
+
+@app.route("/reset_portfolio_halt", methods=["POST"])
+def api_reset_portfolio_halt():
+    """
+    Reset the portfolio daily-loss halt flag so the engine can take new entries.
+    Use after manually force-closing positions to unblock all symbols.
+    POST body: {} (no params needed)
+    """
+    if not live_runner:
+        return jsonify({"error": "Engine not running"}), 400
+    live_runner._portfolio_halted = False
+    print("[App] Portfolio halt reset manually via /reset_portfolio_halt")
+    return jsonify({"status": "ok", "message": "Portfolio halt cleared — engine will accept new entries."})
 
 
 @app.route("/debug_status")

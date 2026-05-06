@@ -84,15 +84,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .pos-item .pl{font-size:10px;color:var(--muted);font-weight:500;margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px}
 .pos-item .pv{font-size:12px;font-weight:600;font-family:'DM Mono',monospace}
 .side-buy{color:var(--blue)}.side-sell{color:var(--red)}
-.card-kill{padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:11px}
+.card-kill{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:11px}
 .kill-off{color:var(--muted)}
 .kill-active{color:var(--green);font-weight:600}
 .kill-fired{color:var(--red);font-weight:600;animation:blink 1s step-end infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.kill-bar-wrap{flex:1;margin-top:5px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
+.kill-bar-wrap{flex:1;margin:0 10px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
 .kill-bar{height:100%;border-radius:2px;background:var(--green);transition:width .5s}
-.ks-reset-btn{font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--red);color:var(--red);background:transparent;cursor:pointer;font-weight:600;white-space:nowrap;flex-shrink:0}
-.ks-reset-btn:hover{background:var(--red);color:#fff}
+.btn-reset-ks{padding:3px 10px;border-radius:5px;border:1px solid rgba(0,102,0,0.45);background:rgba(255,255,255,0.18);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s;white-space:nowrap;flex-shrink:0}
+.btn-reset-ks:hover{background:rgba(255,255,255,0.35)}
 .card-log{padding:10px 14px;flex:1}
 .log-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;justify-content:space-between}
 .log-table{width:100%;border-collapse:collapse;font-size:11px}
@@ -161,6 +161,7 @@ table.ltl-table{width:100%;border-collapse:collapse;font-size:12px}
   <div class="nav-tab active">⏱ Live</div>
   <div class="nav-tab" onclick="location.href='/heatmap'">🔥 Heatmap</div>
   <div class="nav-tab" onclick="location.href='/signals'">📡 Signals</div>
+  <div class="nav-tab" onclick="location.href='/ob'">📖 OB</div>
   <div class="conn-dot" id="connDot"></div>
   <span class="conn-label" id="connLabel">Disconnected</span>
   <div class="nav-right">
@@ -502,20 +503,6 @@ function addSymbol(symbol, token, segment){
   });
 }
 
-function resetKillSwitch(symbol){
-  fetch('/reset_kill_switch',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({symbol})})
-  .then(r=>r.json())
-  .then(d=>{
-    if(d.status==='ok'){
-      toast(`✅ Kill switch reset — ${symbol} is now active`);
-    } else {
-      toast(`❌ Reset failed: ${d.error||'unknown error'}`);
-    }
-  })
-  .catch(()=>toast('❌ Reset request failed'));
-}
-
 function removeSymbol(symbol){
   fetch('/remove_symbol',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({symbol})})
@@ -622,10 +609,8 @@ function cardHTML(symbol, d){
     </div>
     <div class="card-pos">${posHTML}</div>
     <div class="card-kill ${killed?'kill-fired':ks?'kill-active':'kill-off'}">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-        <span>${killTxt}</span>
-        ${killed?`<button onclick="resetKillSwitch('${symbol}')" class="ks-reset-btn" title="Reset kill switch — re-enables entries">↺ Reset</button>`:''}
-      </div>
+      <span>${killTxt}</span>
+      ${killed?`<button class="btn-reset-ks" onclick="resetKillSwitch('${symbol}')">↺ Reset</button>`:''}
       <div class="kill-bar-wrap"><div class="kill-bar" style="width:${killBar}%;background:${killed?'var(--red)':killBar<50?'var(--amber)':'var(--green)'}"></div></div>
     </div>
     <div class="card-log">
@@ -720,6 +705,33 @@ function ltlFetch(symbol, date){
 function closeLTL(e){ if(e.target===document.getElementById('ltlOverlay')) closeLTLBtn(); }
 function closeLTLBtn(){ document.getElementById('ltlOverlay').classList.remove('open'); document.body.style.overflow=''; }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLTLBtn(); });
+async function resetKillSwitch(symbol) {
+  if (!confirm('Reset kill switch for ' + symbol + '?\nThis will allow new entries and is saved permanently.')) return;
+  try {
+    const res  = await fetch('/reset_kill_switch', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({symbol})
+    });
+    const data = await res.json();
+    const toast = document.getElementById('ks-toast') || (() => {
+      const t = document.createElement('div'); t.id='ks-toast';
+      t.style.cssText='position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;color:#fff;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s';
+      document.body.appendChild(t); return t;
+    })();
+    if (data.status === 'ok') {
+      toast.textContent = '✅ Kill switch reset for ' + symbol + ' — saved to DB';
+      toast.style.background = '#16a34a';
+    } else {
+      toast.textContent = '❌ ' + (data.error || 'Reset failed');
+      toast.style.background = '#dc2626';
+    }
+    toast.style.opacity = '1';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+  } catch(e) {
+    console.error('resetKillSwitch error:', e);
+  }
+}
 </script>
 
 <div class="ltl-overlay" id="ltlOverlay" onclick="closeLTL(event)">
