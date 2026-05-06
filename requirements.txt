@@ -12,4 +12,3 @@ python-socketio>=5.10
 psycopg2-binary>=2.9
 python-dateutil>=2.8
 gunicorn>=21.2
-eventlet>=0.35
